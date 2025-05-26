@@ -1,0 +1,94 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using AdoLite.Core.Base;
+using AdoLite.Core.Interfaces;
+using Npgsql;
+
+namespace AdoLite.Postgres
+{
+    public partial class DataQuery : IDataTransaction
+    {
+        public IQueryPattern _queryPattern;
+        public Dictionary<string, string> CreateParameters(string[] values = null)
+        {
+            var parameter = new Dictionary<string, string>();
+            int i = 1;
+            if (values.Length > 0)
+            {
+                foreach (var data in values)
+                {
+                    parameter.Add($"@param{i}", data); // PostgreSQL uses '@' for parameters
+                    i++;
+                }
+            }
+
+            return parameter;
+        }
+
+        public IQueryPattern CreateQuery(string query, Dictionary<string, object> parameters)
+        {
+            _queryPattern = new QueryPattern();
+            _queryPattern.Query = query;
+            _queryPattern.Parameters.Add(parameters);
+            return _queryPattern;
+        }
+
+        /// <summary>
+        /// Saves changes to the database using a list of query patterns.
+        /// </summary>
+        /// <param name="queryPatterns">List of query patterns to be executed.</param>
+        /// <returns>A boolean indicating whether the operation was successful.</returns>
+        public bool SaveChanges(List<IQueryPattern> queryPatterns)
+        {
+            try
+            {
+                using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection)) // PostgreSQL connection
+                {
+                    connection.Open();
+                    NpgsqlTransaction transaction;
+                    transaction = connection.BeginTransaction(); // Begin transaction
+                    try
+                    {
+                        using (NpgsqlCommand cmd = connection.CreateCommand()) // PostgreSQL command
+                        {
+                            cmd.Transaction = transaction;
+                            foreach (var data in queryPatterns)
+                            {
+                                cmd.CommandText = data.Query;
+                                if (data.Parameters.Count > 0 && data.Parameters != null)
+                                {
+                                    cmd.Parameters.Clear();
+                                    foreach (var parameter in data.Parameters)
+                                    {
+                                        foreach (var item in parameter)
+                                        {
+                                            cmd.Parameters.AddWithValue(item.Key, item.Value); // Add parameters to the command
+                                        }
+                                    }
+                                }
+
+                                cmd.ExecuteNonQuery();
+                            }
+                            transaction.Commit(); // Commit the transaction
+                            connection.Close();
+                        }
+                    }
+                    catch (Exception ex1)
+                    {
+                        transaction.Rollback(); // Rollback in case of an error
+                        throw ex1;
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+    }
+}

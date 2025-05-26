@@ -1,0 +1,66 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35707.178
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4EDF5656-072F-4133-907E-4FA1920995FA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{338D67C4-2FE6-4BF7-B909-7D5643EADB26}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{3B38C008-1776-4B6E-9747-6C683A49D892}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.Core", "AdoLite.Core\AdoLite.Core.csproj", "{B69D4482-843B-4BB9-A2A6-55F504659F0E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.Postgres", "AdoLite.Postgres\AdoLite.Postgres.csproj", "{230F13B2-D462-4008-9128-D4342C311531}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.SqlServer", "AdoLite.SqlServer\AdoLite.SqlServer.csproj", "{DB54281A-043D-4190-B22F-3891BCB7E72E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.Common", "AdoLite.Common\AdoLite.Common.csproj", "{CFFF29F6-FBE4-460A-B550-78313CFF2D64}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.MySql", "AdoLite.MySql\AdoLite.MySql.csproj", "{33815830-ECA5-49D9-9D9F-37AADD95524E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.Extension", "AdoLite.Extension\AdoLite.Extension.csproj", "{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B69D4482-843B-4BB9-A2A6-55F504659F0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B69D4482-843B-4BB9-A2A6-55F504659F0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B69D4482-843B-4BB9-A2A6-55F504659F0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B69D4482-843B-4BB9-A2A6-55F504659F0E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{230F13B2-D462-4008-9128-D4342C311531}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{230F13B2-D462-4008-9128-D4342C311531}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{230F13B2-D462-4008-9128-D4342C311531}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{230F13B2-D462-4008-9128-D4342C311531}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB54281A-043D-4190-B22F-3891BCB7E72E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB54281A-043D-4190-B22F-3891BCB7E72E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB54281A-043D-4190-B22F-3891BCB7E72E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB54281A-043D-4190-B22F-3891BCB7E72E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFFF29F6-FBE4-460A-B550-78313CFF2D64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFFF29F6-FBE4-460A-B550-78313CFF2D64}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFFF29F6-FBE4-460A-B550-78313CFF2D64}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFFF29F6-FBE4-460A-B550-78313CFF2D64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33815830-ECA5-49D9-9D9F-37AADD95524E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33815830-ECA5-49D9-9D9F-37AADD95524E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33815830-ECA5-49D9-9D9F-37AADD95524E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33815830-ECA5-49D9-9D9F-37AADD95524E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{B69D4482-843B-4BB9-A2A6-55F504659F0E} = {4EDF5656-072F-4133-907E-4FA1920995FA}
+		{230F13B2-D462-4008-9128-D4342C311531} = {4EDF5656-072F-4133-907E-4FA1920995FA}
+		{DB54281A-043D-4190-B22F-3891BCB7E72E} = {4EDF5656-072F-4133-907E-4FA1920995FA}
+		{CFFF29F6-FBE4-460A-B550-78313CFF2D64} = {4EDF5656-072F-4133-907E-4FA1920995FA}
+		{33815830-ECA5-49D9-9D9F-37AADD95524E} = {4EDF5656-072F-4133-907E-4FA1920995FA}
+		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1} = {4EDF5656-072F-4133-907E-4FA1920995FA}
+	EndGlobalSection
+EndGlobal
