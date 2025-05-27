@@ -15,14 +15,14 @@ namespace AdoLite.Core.Interfaces
         /// <param name="query">The SQL command.</param>
         /// <param name="parameters">The command parameters.</param>
         /// <returns>An instance of IQueryPattern.</returns>
-        IQueryPattern CreateQuery(string query, Dictionary<string, object> parameters);
+        IQueryPattern AddQuery(string query, Dictionary<string, object> parameters);
 
         /// <summary>
         /// Generates a dictionary of SQL parameters from an array of values.
         /// </summary>
         /// <param name="values">An array of parameter values.</param>
         /// <returns>A dictionary of parameter names and values.</returns>
-        Dictionary<string, string> CreateParameters(string[] values = null);
+        Dictionary<string, string> AddParameters(string[] values = null);
 
         /// <summary>
         /// Executes a list of SQL command patterns in a transaction. Rolls back if any fail.

@@ -9,16 +9,12 @@ using Npgsql;
 
 namespace AdoLite.Postgres
 {
-    public partial class DataQuery : IDataQuery
+    public partial class DataQuery(string connectionString) : IDataQuery
     {
 
-        private readonly string _databaseConnection;
+        private readonly string _databaseConnection = connectionString;
 
-        // Constructor to initialize the repository with the connection string
-        public DataQuery(string connectionString)
-        {
-            this._databaseConnection = connectionString;
-        }
+
 
         /// <summary>
         /// Gets a single row of data from the database.
@@ -120,6 +116,46 @@ namespace AdoLite.Postgres
             catch (Exception ex)
             {
                 throw ex;
+            }
+        }
+        public bool Exists(string query, Dictionary<string, string> parameters = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public int GetCount(string query, Dictionary<string, string> parameters = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Dictionary<TKey, TValue> GetDictionary<TKey, TValue>(string query, Dictionary<string, string> parameters = null)
+        {
+
+            throw new NotImplementedException();
+        }
+
+        public List<T> GetList<T>(string query, Dictionary<string, string> parameters = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public List<T> GetMappedList<T>(string query, Func<DataRow, T> mapFunc, Dictionary<string, string> parameters = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public DataTable GetPagedDataTable(string query, Dictionary<string, string> parameters, int pageNumber, int pageSize)
+        {
+            try
+            {
+                int offset = (pageNumber - 1) * pageSize;
+                query += $" LIMIT {pageSize} OFFSET {offset}";
+
+                return GetDataTable(query, parameters);
+            }
+            catch (Exception)
+            {
+                throw;
             }
         }
 

@@ -1,8 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using AdoLite.Core.Interfaces;
-using AdoLite.Common.Enums;
+using AdoLite.Core.Enums;
 using AdoLite.Postgres;
 using AdoLite.Core.Services;
+using AdoLite.SqlServer;
 
 
 namespace AdoLite.Extension
@@ -28,7 +29,11 @@ namespace AdoLite.Extension
                 // TODO: Resolve other dependencies from provider here
                 ),
                 // DatabaseProvider.MySQL => _ => new MySqlDataContext(connectionString),
-                //  DatabaseProvider.SqlServer => _ => new MsSqlDataContext(connectionString),
+                // DatabaseProvider.SqlServer => _ => new MsSqlDataContext(connectionString),
+                DatabaseProvider.SqlServer => provider => new MsSqlDataContext(
+                   connectionString,
+                   provider.GetRequiredService<IDataJSONServices>()
+               ),
                 _ => throw new NotSupportedException($"Database provider '{providerType}' is not supported.")
             };
 

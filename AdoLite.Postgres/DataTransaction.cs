@@ -13,23 +13,24 @@ namespace AdoLite.Postgres
     public partial class DataQuery : IDataTransaction
     {
         public IQueryPattern _queryPattern;
-        public Dictionary<string, string> CreateParameters(string[] values = null)
+        public Dictionary<string, string> AddParameters(string[] values = null)
         {
-            var parameter = new Dictionary<string, string>();
-            int i = 1;
-            if (values.Length > 0)
+            var parameters = new Dictionary<string, string>();
+
+            if (values != null && values.Length > 0)
             {
-                foreach (var data in values)
+                for (int i = 0; i < values.Length; i++)
                 {
-                    parameter.Add($"@param{i}", data); // PostgreSQL uses '@' for parameters
-                    i++;
+                    // prefers parameters like @param1, @param2
+                    parameters.Add($"@param{i + 1}", values[i]);
                 }
             }
 
-            return parameter;
+            return parameters;
         }
 
-        public IQueryPattern CreateQuery(string query, Dictionary<string, object> parameters)
+
+        public IQueryPattern AddQuery(string query, Dictionary<string, object> parameters)
         {
             _queryPattern = new QueryPattern();
             _queryPattern.Query = query;

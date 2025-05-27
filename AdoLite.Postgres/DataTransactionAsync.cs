@@ -16,14 +16,14 @@ namespace AdoLite.Postgres
         /// </summary>
         /// <param name="queryPatterns">A list of queries to be executed.</param>
         /// <returns>True if all queries were successfully executed and committed.</returns>
-        public async Task<bool> SaveChangesAsync(List<IQueryPattern> queryPatterns)
+        public async Task<bool> SaveChangesAsync(List<IQueryPattern> queryPatterns, int commandTimeoutSeconds = 30, CancellationToken cancellationToken = default)
         {
             try
             {
                 using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection))
                 {
                     await connection.OpenAsync();  // Open connection asynchronously
-                    var transaction = await connection.BeginTransactionAsync();  // Begin a transaction
+                    var transaction = await connection.BeginTransactionAsync(cancellationToken);  // Begin a transaction
 
                     try
                     {
@@ -35,7 +35,7 @@ namespace AdoLite.Postgres
                             foreach (var data in queryPatterns)
                             {
                                 cmd.CommandText = data.Query;  // Set the query text
-
+                                cmd.CommandTimeout = commandTimeoutSeconds;
                                 // Add parameters to the command if provided
                                 if (data.Parameters.Count > 0 && data.Parameters != null)
                                 {
@@ -50,15 +50,15 @@ namespace AdoLite.Postgres
                                 }
 
                                 // Execute the query asynchronously
-                                await cmd.ExecuteNonQueryAsync();
+                                await cmd.ExecuteNonQueryAsync(cancellationToken);
                             }
 
-                            await transaction.CommitAsync();  // Commit the transaction if all queries were successful
+                            await transaction.CommitAsync(cancellationToken);  // Commit the transaction if all queries were successful
                         }
                     }
                     catch (Exception)
                     {
-                        await transaction.RollbackAsync();  // Rollback the transaction if there was an error
+                        await transaction.RollbackAsync(cancellationToken);  // Rollback the transaction if there was an error
                         throw;
                     }
                 }
