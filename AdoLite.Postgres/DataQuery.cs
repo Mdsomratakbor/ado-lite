@@ -196,5 +196,15 @@ namespace AdoLite.Postgres
                 throw;
             }
         }
+
+        public T GetSingleRecord<T>(string query, Dictionary<string, string> parameter = null) where T : new()
+        {
+            throw new NotImplementedException();
+        }
+
+        public List<T> GetRecordList<T>(string query, Dictionary<string, string> parameter = null)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

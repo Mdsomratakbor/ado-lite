@@ -138,58 +138,7 @@ namespace AdoLite.SqlServer
             }
         }
 
-        /// <summary>
-        /// Executes a SQL query and maps the result set to a list of objects of type T.
-        /// </summary>
-        /// <typeparam name="T">The type of the model to return.</typeparam>
-        /// <param name="query">The SQL query to execute.</param>
-        /// <param name="parameter">Parameters for the query.</param>
-        /// <returns>A list of objects of type T representing the result set.</returns>
-        public virtual List<T> GetRecordList<T>(string query, Dictionary<string, string> parameter = null) where T : new()
-        {
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_databaseConnection))
-                {
-                    using (SqlDataAdapter dataAdapter = new SqlDataAdapter(query, connection))
-                    {
-                        if (parameter != null && parameter.Count > 0)
-                        {
-                            foreach (var item in parameter)
-                            {
-                                dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-                            }
-                        }
-
-                        DataTable dataTable = new DataTable();
-                        dataAdapter.Fill(dataTable);
-
-                        List<T> resultList = new List<T>();
-
-                        foreach (DataRow row in dataTable.Rows)
-                        {
-                            T obj = new T();
-                            foreach (DataColumn column in dataTable.Columns)
-                            {
-                                PropertyInfo prop = typeof(T).GetProperty(column.ColumnName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                                if (prop != null && row[column] != DBNull.Value)
-                                {
-                                    prop.SetValue(obj, Convert.ChangeType(row[column], prop.PropertyType));
-                                }
-                            }
-                            resultList.Add(obj);
-                        }
-
-                        return resultList;
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                throw;
-            }
-        }
-
+       
         /// <summary>
         /// Gets a DataTable from the database for the given query.
         /// </summary>

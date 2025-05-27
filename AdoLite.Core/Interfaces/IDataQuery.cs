@@ -36,14 +36,6 @@ namespace AdoLite.Core.Interfaces
         DataSet GetDataSet(string query, Dictionary<string, string> parameters);
 
         /// <summary>
-        /// Executes a SQL query and maps the result set to a list of objects of type T.
-        /// </summary>
-        /// <typeparam name="T">The type of the model to return.</typeparam>
-        /// <param name="query">The SQL query to execute.</param>
-        /// <param name="parameter">Parameters for the query.</param>
-        /// <returns>A list of objects of type T representing the result set.</returns>
-        List<T> GetRecordList<T>(string query, Dictionary<string, string> parameter = null);
-        /// <summary>
         /// Executes a SQL query and returns a single DataRow.
         /// </summary>
         /// <param name="query">The SQL query to execute.</param>
