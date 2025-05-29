@@ -9,12 +9,18 @@ using Npgsql;
 
 namespace AdoLite.Postgres
 {
-    public partial class DataQuery(string connectionString) : IDataQuery
+    public partial class DataQuery : IDataQuery, IDisposable
     {
+        private readonly string _databaseConnection;
+        private readonly NpgsqlConnection _connection;
+        private bool _disposed;
 
-        private readonly string _databaseConnection = connectionString;
-
-
+        public DataQuery(string connectionString)
+        {
+            _databaseConnection = connectionString;
+            _connection = new NpgsqlConnection(_databaseConnection);
+            _connection.Open(); // Open once and share
+        }
 
         /// <summary>
         /// Gets a single row of data from the database.
@@ -26,23 +32,22 @@ namespace AdoLite.Postgres
         {
             try
             {
-                using (NpgsqlConnection obcon = new NpgsqlConnection(_databaseConnection)) // PostgreSQL connection
-                {
-                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, obcon)) // PostgreSQL data adapter
-                    {
-                        if (parameter != null && parameter.Count > 0)
-                        {
-                            foreach (var item in parameter)
-                            {
-                                dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-                            }
-                        }
-                        DataTable dataTable = new DataTable();
-                        dataAdapter.Fill(dataTable);
 
-                        DataRow row = dataTable.Rows[0];
-                        return row;
+                using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection)) // PostgreSQL data adapter
+                {
+                    if (parameter != null && parameter.Count > 0)
+                    {
+                        foreach (var item in parameter)
+                        {
+                            dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
+                        }
                     }
+                    DataTable dataTable = new DataTable();
+                    dataAdapter.Fill(dataTable);
+
+                    DataRow row = dataTable.Rows[0];
+                    return row;
+
                 }
             }
             catch (Exception)
@@ -61,9 +66,8 @@ namespace AdoLite.Postgres
         {
             try
             {
-                using (NpgsqlConnection obcon = new NpgsqlConnection(_databaseConnection)) // PostgreSQL connection
-                {
-                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, obcon)) // PostgreSQL data adapter
+              
+                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection)) // PostgreSQL data adapter
                     {
                         if (parameter != null && parameter.Count > 0)
                         {
@@ -76,7 +80,7 @@ namespace AdoLite.Postgres
                         dataAdapter.Fill(dataSet);
                         return dataSet;
                     }
-                }
+                
             }
             catch (Exception ex)
             {
@@ -95,9 +99,8 @@ namespace AdoLite.Postgres
         {
             try
             {
-                using (NpgsqlConnection obcon = new NpgsqlConnection(_databaseConnection)) // PostgreSQL connection
-                {
-                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, obcon)) // PostgreSQL data adapter
+               
+                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection)) // PostgreSQL data adapter
                     {
 
                         if (parameter != null && parameter.Count > 0)
@@ -111,7 +114,7 @@ namespace AdoLite.Postgres
                         dataAdapter.Fill(dt);
                         return dt;
                     }
-                }
+                
             }
             catch (Exception ex)
             {
@@ -172,10 +175,8 @@ namespace AdoLite.Postgres
             try
             {
                 var data = "";
-                using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection)) // PostgreSQL connection
-                {
-                    connection.Open();
-                    using (NpgsqlCommand cmd = new NpgsqlCommand(query, connection)) // PostgreSQL command
+               
+                    using (NpgsqlCommand cmd = new NpgsqlCommand(query, _connection)) // PostgreSQL command
                     {
                         NpgsqlDataReader reader = cmd.ExecuteReader();
                         if (reader.HasRows)
@@ -185,11 +186,10 @@ namespace AdoLite.Postgres
                                 data = Convert.ToString(reader[0]);
                             }
                             reader.Close();
-                            connection.Close();
                         }
                         return (T)Convert.ChangeType(data, typeof(T));
                     }
-                }
+                
             }
             catch (Exception)
             {
@@ -205,6 +205,19 @@ namespace AdoLite.Postgres
         public List<T> GetRecordList<T>(string query, Dictionary<string, string> parameter = null)
         {
             throw new NotImplementedException();
+        }
+        /// <summary>
+        /// Dispose and close shared connection
+        /// </summary>
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _connection?.Close();
+                _connection?.Dispose();
+                _disposed = true;
+            }
+            GC.SuppressFinalize(this);
         }
     }
 }

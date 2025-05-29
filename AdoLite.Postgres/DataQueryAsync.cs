@@ -21,30 +21,29 @@ namespace AdoLite.Postgres
         {
             try
             {
-                using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection))
+
+                using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection))
                 {
-                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, connection))
+                    // Add parameters to the data adapter if provided
+                    if (parameter != null && parameter.Count > 0)
                     {
-                        // Add parameters to the data adapter if provided
-                        if (parameter != null && parameter.Count > 0)
+                        foreach (var item in parameter)
                         {
-                            foreach (var item in parameter)
-                            {
-                                dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-                            }
+                            dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
                         }
-
-                        // Fill the DataTable with the query results
-                        DataTable dataTable = new DataTable();
-                        await Task.Run(() => dataAdapter.Fill(dataTable));
-
-                        // Return the first row of the DataTable
-                        if (dataTable.Rows.Count > 0)
-                            return dataTable.Rows[0];
-
-                        return null;  // Return null if no rows were found
                     }
+
+                    // Fill the DataTable with the query results
+                    DataTable dataTable = new DataTable();
+                    await Task.Run(() => dataAdapter.Fill(dataTable));
+
+                    // Return the first row of the DataTable
+                    if (dataTable.Rows.Count > 0)
+                        return dataTable.Rows[0];
+
+                    return null;  // Return null if no rows were found
                 }
+
             }
             catch (Exception ex)
             {
@@ -62,9 +61,8 @@ namespace AdoLite.Postgres
         {
             try
             {
-                using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection))
-                {
-                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, connection))
+              
+                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection))
                     {
                         // Add parameters to the data adapter if provided
                         if (parameter != null && parameter.Count > 0)
@@ -80,7 +78,7 @@ namespace AdoLite.Postgres
                         await Task.Run(() => dataAdapter.Fill(dataSet));
                         return dataSet;
                     }
-                }
+                
             }
             catch (Exception ex)
             {
@@ -98,9 +96,8 @@ namespace AdoLite.Postgres
         {
             try
             {
-                using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection))
-                {
-                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, connection))
+              
+                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection))
                     {
                         // Add parameters to the data adapter if provided
                         if (parameter != null && parameter.Count > 0)
@@ -116,7 +113,6 @@ namespace AdoLite.Postgres
                         await Task.Run(() => dataAdapter.Fill(dt));
                         return dt;
                     }
-                }
             }
             catch (Exception ex)
             {
@@ -136,10 +132,7 @@ namespace AdoLite.Postgres
             try
             {
                 var data = "";  // Variable to hold the retrieved data
-                using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection))
-                {
-                    await connection.OpenAsync();  // Open connection asynchronously
-                    using (NpgsqlCommand cmd = new NpgsqlCommand(query, connection))
+                    using (NpgsqlCommand cmd = new NpgsqlCommand(query, _connection))
                     {
                         // Add parameters to the command if provided
                         if (parameter != null && parameter.Count > 0)
@@ -162,7 +155,6 @@ namespace AdoLite.Postgres
                             }
                         }
                     }
-                }
                 return (T)Convert.ChangeType(data, typeof(T));  // Convert the result to the specified type
             }
             catch (Exception ex)

@@ -1,33 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using Microsoft.Data.SqlClient;
+using MySql.Data.MySqlClient;
 using AdoLite.Core.Interfaces;
 using System.Reflection;
 
-namespace AdoLite.SqlServer
+namespace AdoLite.MySql
 {
     public partial class DataQuery : IDataQuery, IDisposable
     {
         private readonly string _databaseConnection;
-        private readonly SqlConnection _connection;
+        private readonly MySqlConnection _connection;
         private bool _disposed;
 
         public DataQuery(string connectionString)
         {
             _databaseConnection = connectionString;
-            _connection = new SqlConnection(_databaseConnection);
-            _connection.Open(); // Open once and share
+            _connection = new MySqlConnection(_databaseConnection);
+            _connection.Open();
         }
 
         public virtual DataRow GetDataRow(string query, Dictionary<string, string> parameter = null)
         {
-            using SqlDataAdapter dataAdapter = new SqlDataAdapter(query, _connection);
-            if (parameter != null)
-            {
-                foreach (var item in parameter)
-                    dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-            }
+            using var dataAdapter = new MySqlDataAdapter(query, _connection);
+            AddParameters(dataAdapter.SelectCommand, parameter);
 
             DataTable dataTable = new DataTable();
             dataAdapter.Fill(dataTable);
@@ -36,12 +32,8 @@ namespace AdoLite.SqlServer
 
         public virtual T GetSingleRecord<T>(string query, Dictionary<string, string> parameter = null) where T : new()
         {
-            using SqlDataAdapter dataAdapter = new SqlDataAdapter(query, _connection);
-            if (parameter != null)
-            {
-                foreach (var item in parameter)
-                    dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-            }
+            using var dataAdapter = new MySqlDataAdapter(query, _connection);
+            AddParameters(dataAdapter.SelectCommand, parameter);
 
             DataTable dataTable = new DataTable();
             dataAdapter.Fill(dataTable);
@@ -62,12 +54,8 @@ namespace AdoLite.SqlServer
 
         public virtual DataSet GetDataSet(string query, Dictionary<string, string> parameter)
         {
-            using SqlDataAdapter dataAdapter = new SqlDataAdapter(query, _connection);
-            if (parameter != null)
-            {
-                foreach (var item in parameter)
-                    dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-            }
+            using var dataAdapter = new MySqlDataAdapter(query, _connection);
+            AddParameters(dataAdapter.SelectCommand, parameter);
 
             DataSet dataSet = new DataSet();
             dataAdapter.Fill(dataSet);
@@ -76,12 +64,8 @@ namespace AdoLite.SqlServer
 
         public virtual DataTable GetDataTable(string query, Dictionary<string, string> parameter = null)
         {
-            using SqlDataAdapter dataAdapter = new SqlDataAdapter(query, _connection);
-            if (parameter != null)
-            {
-                foreach (var item in parameter)
-                    dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-            }
+            using var dataAdapter = new MySqlDataAdapter(query, _connection);
+            AddParameters(dataAdapter.SelectCommand, parameter);
 
             DataTable dataTable = new DataTable();
             dataAdapter.Fill(dataTable);
@@ -90,12 +74,8 @@ namespace AdoLite.SqlServer
 
         public virtual T GetSingleValue<T>(string query, Dictionary<string, string> parameter = null)
         {
-            using SqlCommand command = new SqlCommand(query, _connection);
-            if (parameter != null)
-            {
-                foreach (var item in parameter)
-                    command.Parameters.AddWithValue(item.Key, item.Value);
-            }
+            using var command = new MySqlCommand(query, _connection);
+            AddParameters(command, parameter);
 
             object result = command.ExecuteScalar();
             return (result != null && result != DBNull.Value)
@@ -122,14 +102,10 @@ namespace AdoLite.SqlServer
 
         public bool Exists(string query, Dictionary<string, string> parameters = null)
         {
-            using SqlCommand command = new SqlCommand(query, _connection);
-            if (parameters != null)
-            {
-                foreach (var item in parameters)
-                    command.Parameters.AddWithValue(item.Key, item.Value);
-            }
+            using var command = new MySqlCommand(query, _connection);
+            AddParameters(command, parameters);
 
-            using SqlDataReader reader = command.ExecuteReader();
+            using var reader = command.ExecuteReader();
             return reader.HasRows;
         }
 
@@ -139,17 +115,17 @@ namespace AdoLite.SqlServer
             if (pageSize < 1) pageSize = 10;
 
             int offset = (pageNumber - 1) * pageSize;
-            string pagedQuery = $"{query} OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+            string pagedQuery = $"{query} LIMIT @PageSize OFFSET @Offset";
 
             var paramObj = parameters?.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value) ?? new();
-            paramObj["@Offset"] = offset;
             paramObj["@PageSize"] = pageSize;
+            paramObj["@Offset"] = offset;
 
-            using SqlCommand command = new SqlCommand(pagedQuery, _connection);
+            using var command = new MySqlCommand(pagedQuery, _connection);
             foreach (var param in paramObj)
                 command.Parameters.AddWithValue(param.Key, param.Value);
 
-            using SqlDataAdapter adapter = new SqlDataAdapter(command);
+            using var adapter = new MySqlDataAdapter(command);
             var dataTable = new DataTable();
             adapter.Fill(dataTable);
             return dataTable;
@@ -183,9 +159,15 @@ namespace AdoLite.SqlServer
             return list;
         }
 
-        /// <summary>
-        /// Dispose and close shared connection
-        /// </summary>
+        private void AddParameters(MySqlCommand command, Dictionary<string, string> parameters)
+        {
+            if (parameters != null)
+            {
+                foreach (var param in parameters)
+                    command.Parameters.AddWithValue(param.Key, param.Value);
+            }
+        }
+
         public void Dispose()
         {
             if (!_disposed)
@@ -197,5 +179,4 @@ namespace AdoLite.SqlServer
             GC.SuppressFinalize(this);
         }
     }
-
 }

@@ -20,14 +20,12 @@ namespace AdoLite.Postgres
         {
             try
             {
-                using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection))
-                {
-                    await connection.OpenAsync();  // Open connection asynchronously
-                    var transaction = await connection.BeginTransactionAsync(cancellationToken);  // Begin a transaction
+               
+                    var transaction = await _connection.BeginTransactionAsync(cancellationToken);  // Begin a transaction
 
                     try
                     {
-                        using (NpgsqlCommand cmd = connection.CreateCommand())
+                        using (NpgsqlCommand cmd = _connection.CreateCommand())
                         {
                             cmd.Transaction = transaction;  // Assign the transaction to the command
 
@@ -61,7 +59,7 @@ namespace AdoLite.Postgres
                         await transaction.RollbackAsync(cancellationToken);  // Rollback the transaction if there was an error
                         throw;
                     }
-                }
+                
 
                 return true;  // Return true if all queries were executed successfully
             }

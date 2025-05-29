@@ -20,14 +20,12 @@ namespace AdoLite.SqlServer
         {
             try
             {
-                await using (var connection = new SqlConnection(_databaseConnection))
-                {
-                    await connection.OpenAsync(cancellationToken);
-                    await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+                    await using var transaction = (SqlTransaction)await _connection.BeginTransactionAsync(cancellationToken);
                     
                         try
                         {
-                            await using (var cmd = connection.CreateCommand())
+                            await using (var cmd = _connection.CreateCommand())
                             {
                                 cmd.Transaction = transaction;
                                 cmd.CommandTimeout = commandTimeoutSeconds; 
@@ -61,7 +59,7 @@ namespace AdoLite.SqlServer
                             throw;
                         }
                     
-                }
+                
             }
             catch
             {

@@ -47,14 +47,11 @@ namespace AdoLite.Postgres
         {
             try
             {
-                using (NpgsqlConnection connection = new NpgsqlConnection(_databaseConnection)) // PostgreSQL connection
-                {
-                    connection.Open();
                     NpgsqlTransaction transaction;
-                    transaction = connection.BeginTransaction(); // Begin transaction
+                    transaction = _connection.BeginTransaction(); // Begin transaction
                     try
                     {
-                        using (NpgsqlCommand cmd = connection.CreateCommand()) // PostgreSQL command
+                        using (NpgsqlCommand cmd = _connection.CreateCommand()) // PostgreSQL command
                         {
                             cmd.Transaction = transaction;
                             foreach (var data in queryPatterns)
@@ -75,7 +72,6 @@ namespace AdoLite.Postgres
                                 cmd.ExecuteNonQuery();
                             }
                             transaction.Commit(); // Commit the transaction
-                            connection.Close();
                         }
                     }
                     catch (Exception ex1)
@@ -83,7 +79,7 @@ namespace AdoLite.Postgres
                         transaction.Rollback(); // Rollback in case of an error
                         throw ex1;
                     }
-                }
+                
                 return true;
             }
             catch (Exception ex)

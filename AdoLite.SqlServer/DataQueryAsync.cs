@@ -16,9 +16,8 @@ namespace AdoLite.SqlServer
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_databaseConnection))
-                {
-                    using (SqlCommand command = new SqlCommand(query, connection))
+               
+                    using (SqlCommand command = new SqlCommand(query, _connection))
                     {
                         if (parameter != null)
                         {
@@ -28,7 +27,6 @@ namespace AdoLite.SqlServer
                             }
                         }
 
-                        await connection.OpenAsync();
 
                         using (SqlDataReader reader = await command.ExecuteReaderAsync())
                         {
@@ -41,7 +39,7 @@ namespace AdoLite.SqlServer
                             return null;
                         }
                     }
-                }
+                
             }
             catch (Exception)
             {
@@ -56,8 +54,7 @@ namespace AdoLite.SqlServer
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_databaseConnection))
-                using (SqlCommand command = new SqlCommand(query, connection))
+                using (SqlCommand command = new SqlCommand(query, _connection))
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command))
                 {
                     if (parameter != null)
@@ -89,8 +86,7 @@ namespace AdoLite.SqlServer
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_databaseConnection))
-                using (SqlCommand command = new SqlCommand(query, connection))
+                using (SqlCommand command = new SqlCommand(query, _connection))
                 using (SqlDataAdapter adapter = new SqlDataAdapter(command))
                 {
                     if (parameter != null)
@@ -119,8 +115,7 @@ namespace AdoLite.SqlServer
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_databaseConnection))
-                using (SqlCommand command = new SqlCommand(query, connection))
+                using (SqlCommand command = new SqlCommand(query, _connection))
                 {
                     if (parameter != null)
                     {
@@ -129,8 +124,6 @@ namespace AdoLite.SqlServer
                             command.Parameters.AddWithValue(item.Key, item.Value);
                         }
                     }
-
-                    await connection.OpenAsync();
 
                     object result = await command.ExecuteScalarAsync();
 

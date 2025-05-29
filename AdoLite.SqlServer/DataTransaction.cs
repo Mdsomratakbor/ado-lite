@@ -43,14 +43,12 @@ namespace AdoLite.SqlServer
         {
             try
             {
-                using (SqlConnection connection = new SqlConnection(_databaseConnection))
-                {
-                    connection.Open();
-                    using (SqlTransaction transaction = connection.BeginTransaction())
+        
+                    using (SqlTransaction transaction = _connection.BeginTransaction())
                     {
                         try
                         {
-                            using (SqlCommand cmd = connection.CreateCommand())
+                            using (SqlCommand cmd = _connection.CreateCommand())
                             {
                                 cmd.Transaction = transaction;
 
@@ -82,7 +80,7 @@ namespace AdoLite.SqlServer
                             throw;
                         }
                     }
-                }
+                
             }
             catch (Exception)
             {

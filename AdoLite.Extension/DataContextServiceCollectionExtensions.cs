@@ -4,6 +4,7 @@ using AdoLite.Core.Enums;
 using AdoLite.Postgres;
 using AdoLite.Core.Services;
 using AdoLite.SqlServer;
+using AdoLite.MySql;
 
 
 namespace AdoLite.Extension
@@ -26,14 +27,15 @@ namespace AdoLite.Extension
                 DatabaseProvider.PostgreSQL => provider => new PostgresDataContext(
                     connectionString,
                     provider.GetRequiredService<IDataJSONServices>()
-                // TODO: Resolve other dependencies from provider here
                 ),
-                // DatabaseProvider.MySQL => _ => new MySqlDataContext(connectionString),
-                // DatabaseProvider.SqlServer => _ => new MsSqlDataContext(connectionString),
                 DatabaseProvider.SqlServer => provider => new MsSqlDataContext(
                    connectionString,
                    provider.GetRequiredService<IDataJSONServices>()
                ),
+                DatabaseProvider.MySQL => provider => new MySqlDataContext(
+                 connectionString,
+                 provider.GetRequiredService<IDataJSONServices>()
+             ),
                 _ => throw new NotSupportedException($"Database provider '{providerType}' is not supported.")
             };
 

@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AdoLite.Core\AdoLite.Core.csproj" />
+    <ProjectReference Include="..\AdoLite.MySql\AdoLite.MySql.csproj" />
     <ProjectReference Include="..\AdoLite.Postgres\AdoLite.Postgres.csproj" />
     <ProjectReference Include="..\AdoLite.SqlServer\AdoLite.SqlServer.csproj" />
   </ItemGroup>
