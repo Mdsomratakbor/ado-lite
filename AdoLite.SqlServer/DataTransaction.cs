@@ -11,9 +11,9 @@ namespace AdoLite.SqlServer
     {
         public IQueryPattern _queryPattern;
 
-        public Dictionary<string, string> AddParameters(string[] values = null)
+        public Dictionary<string, object> AddParameters(string[] values = null)
         {
-            var parameter = new Dictionary<string, string>();
+            var parameter = new Dictionary<string, object>();
             int i = 1;
             if (values != null && values.Length > 0)
             {
@@ -59,14 +59,32 @@ namespace AdoLite.SqlServer
 
                                     if (data.Parameters != null && data.Parameters.Count > 0)
                                     {
-                                        foreach (var parameterDict in data.Parameters)
+                                    //foreach (var parameterDict in data.Parameters)
+                                    //{
+                                    //    foreach (var param in parameterDict)
+                                    //    {
+                                    //        cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                                    //    }
+                                    //}
+
+                                    foreach (var parameterDict in data.Parameters)
+                                    {
+                                        foreach (var param in parameterDict)
                                         {
-                                            foreach (var param in parameterDict)
+                                            object value = param.Value;
+
+                                            // If the value itself is a SqlParameter, unwrap its actual value
+                                            if (value is SqlParameter sqlParam)
                                             {
-                                                cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                                                value = sqlParam.Value ?? DBNull.Value;
                                             }
+
+                                            cmd.Parameters.AddWithValue(param.Key, value ?? DBNull.Value);
                                         }
                                     }
+
+
+                                }
 
                                     cmd.ExecuteNonQuery();
                                 }
@@ -85,6 +103,16 @@ namespace AdoLite.SqlServer
             catch (Exception)
             {
                 throw;
+            }
+        }
+
+
+        public void ExecuteRawSql(string query)
+        {
+            using (SqlCommand cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = query;
+                cmd.ExecuteNonQuery();
             }
         }
     }

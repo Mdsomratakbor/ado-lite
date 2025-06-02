@@ -12,9 +12,9 @@ namespace AdoLite.MySql
         public IQueryPattern _queryPattern;
 
 
-        public Dictionary<string, string> AddParameters(string[] values = null)
+        public Dictionary<string, object> AddParameters(string[] values = null)
         {
-            var parameter = new Dictionary<string, string>();
+            var parameter = new Dictionary<string, object>();
             int i = 1;
             if (values != null && values.Length > 0)
             {
@@ -82,6 +82,13 @@ namespace AdoLite.MySql
                 throw;
             }
         }
-
+        public void ExecuteRawSql(string query)
+        {
+            using (MySqlCommand cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = query;
+                cmd.ExecuteNonQuery();
+            }
+        }
     }
 }

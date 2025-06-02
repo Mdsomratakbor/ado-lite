@@ -22,7 +22,7 @@ namespace AdoLite.Core.Interfaces
         /// </summary>
         /// <param name="values">An array of parameter values.</param>
         /// <returns>A dictionary of parameter names and values.</returns>
-        Dictionary<string, string> AddParameters(string[] values = null);
+        Dictionary<string, object> AddParameters(string[] values = null);
 
         /// <summary>
         /// Executes a list of SQL command patterns in a transaction. Rolls back if any fail.
@@ -30,5 +30,10 @@ namespace AdoLite.Core.Interfaces
         /// <param name="queryPatterns">A list of SQL command patterns.</param>
         /// <returns>True if all commands succeed, otherwise false.</returns>
         bool SaveChanges(List<IQueryPattern> queryPatterns);
+        /// <summary>
+        /// Executes a raw SQL command that does not return a result set (e.g., DDL or setup scripts).
+        /// </summary>
+        /// <param name="query">The raw SQL command to execute.</param>
+        void ExecuteRawSql(string query);
     }
 }

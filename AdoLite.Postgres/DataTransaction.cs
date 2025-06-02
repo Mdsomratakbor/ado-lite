@@ -13,9 +13,9 @@ namespace AdoLite.Postgres
     public partial class DataQuery : IDataTransaction
     {
         public IQueryPattern _queryPattern;
-        public Dictionary<string, string> AddParameters(string[] values = null)
+        public Dictionary<string, object> AddParameters(string[] values = null)
         {
-            var parameters = new Dictionary<string, string>();
+            var parameters = new Dictionary<string, object>();
 
             if (values != null && values.Length > 0)
             {
@@ -85,6 +85,15 @@ namespace AdoLite.Postgres
             catch (Exception ex)
             {
                 throw ex;
+            }
+        }
+
+        public void ExecuteRawSql(string query)
+        {
+            using (NpgsqlCommand cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = query;
+                cmd.ExecuteNonQuery();
             }
         }
     }

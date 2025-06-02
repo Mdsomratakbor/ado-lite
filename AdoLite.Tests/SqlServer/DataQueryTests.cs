@@ -5,6 +5,8 @@ using Xunit;
 using AdoLite.SqlServer;
 using AdoLite.Tests.SqlServer.Models;
 using Microsoft.Data.SqlClient;
+using AdoLite.Core.Interfaces;
+using AdoLite.Core.Base;
 
 namespace AdoLite.Tests.SqlServer;
 public class DataQueryIntegrationTests : IDisposable
@@ -530,15 +532,36 @@ public class DataQueryIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void GetPagedDataTable_WithValidQueryAndParameters_ReturnsExpectedRows()
+    public void GetPagedDataTable_WithUserRolesJoin_ReturnsOnlyAdmins()
     {
-        var query = "SELECT * FROM Users WHERE Role = @Role ORDER BY Id";
-        var parameters = new Dictionary<string, string> { { "@Role", "Admin" } };
-        var dt = _dataQuery.GetPagedDataTable(query, parameters, 1, 5);
+        var query = @"
+        SELECT 
+            u.Id AS UserId, 
+            u.Name, 
+            r.RoleName
+        FROM Users u
+        INNER JOIN UserRoles ur ON u.Id = ur.UserId
+        INNER JOIN Roles r ON ur.RoleId = r.RoleId
+        WHERE r.RoleName = @Role
+        ORDER BY u.Id";
+
+        var parameters = new Dictionary<string, string>
+    {
+        { "@Role", "Admin" }
+    };
+
+        var dt = _dataQuery.GetPagedDataTable(query, parameters, pageNumber: 1, pageSize: 10);
+
         Assert.NotNull(dt);
-        Assert.True(dt.Rows.Count <= 5);
-        // Optional: Assert all rows have Role = "Admin"
+        Assert.True(dt.Rows.Count <= 10);
+
+        foreach (DataRow row in dt.Rows)
+        {
+            Assert.Equal("Admin", row["RoleName"].ToString());
+        }
     }
+
+
 
     [Fact]
     public void GetPagedDataTable_PageNumberLessThanOne_TreatedAsFirstPage()
@@ -691,6 +714,279 @@ public class DataQueryIntegrationTests : IDisposable
             _dataQuery.GetMappedList<User>(null, row => new User { Id = 1, Name = "Test" }));
     }
 
-    // A test DTO class used for GetSingleRecord and GetMappedList
+    [Fact]
+    public void AddParameters_NullInput_ReturnsEmptyDictionary()
+    {
+        var result = _dataQuery.AddParameters(null);
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+    [Fact]
+    public void AddParameters_EmptyArray_ReturnsEmptyDictionary()
+    {
+        var result = _dataQuery.AddParameters(Array.Empty<string>());
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void AddParameters_ValidInput_ReturnsExpectedDictionary()
+    {
+        var input = new[] { "val1", "val2" };
+        var result = _dataQuery.AddParameters(input);
+
+        Assert.Equal(2, result.Count);
+        Assert.True(result.ContainsKey("@param1"));
+        Assert.True(result.ContainsKey("@param2"));
+        Assert.Equal("val1", result["@param1"]);
+        Assert.Equal("val2", result["@param2"]);
+    }
+    [Fact]
+    public void AddQuery_ValidInput_ReturnsQueryPattern()
+    {
+        var parameters = new Dictionary<string, object> { { "@param1", "value" } };
+        var result = _dataQuery.AddQuery("SELECT * FROM Users", parameters);
+
+        Assert.NotNull(result);
+        Assert.Equal("SELECT * FROM Users", result.Query);
+        Assert.Single(result.Parameters);
+        Assert.Equal("value", result.Parameters[0]["@param1"]);
+    }
+    [Fact]
+    public void AddQuery_EmptyParameters_AddsEmptyDictionary()
+    {
+        var result = _dataQuery.AddQuery("SELECT 1", new Dictionary<string, object>());
+
+        Assert.NotNull(result);
+        Assert.Equal("SELECT 1", result.Query);
+        Assert.Single(result.Parameters); // Added 1 dictionary
+        Assert.Empty(result.Parameters[0]);
+    }
+
+    [Fact]
+    public void SaveChanges_ValidQueries_ReturnsTrue()
+    {
+        var queryPatterns = new List<IQueryPattern>
+    {
+        new QueryPattern
+        {
+            Query = "INSERT INTO Users (Name) VALUES ('TestUser')",
+            Parameters = new List<Dictionary<string, object>>() // No parameters
+        }
+    };
+
+        var result = _dataQuery.SaveChanges(queryPatterns);
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void SaveChanges_MultipleValidQueries_ReturnsTrue()
+    {
+        // Arrange
+        var insertUserQuery = new QueryPattern
+        {
+            Query = "INSERT INTO Users (Name, Email) VALUES (@Name, @Email)",
+            Parameters = new List<Dictionary<string, object>>
+        {
+            new Dictionary<string, object>
+            {
+                { "@Name", "TestUser1" },
+                { "@Email", "testuser1@example.com" }
+            }
+        }
+        };
+
+        var insertRoleQuery = new QueryPattern
+        {
+            Query = "INSERT INTO Roles (RoleName) VALUES (@RoleName)",
+            Parameters = new List<Dictionary<string, object>>
+        {
+            new Dictionary<string, object>
+            {
+                { "@RoleName", "TestRole" }
+            }
+        }
+        };
+
+        var queryPatterns = new List<IQueryPattern> { insertUserQuery, insertRoleQuery };
+
+        // Act
+        var result = _dataQuery.SaveChanges(queryPatterns);
+
+        // Assert
+        Assert.True(result);
+    }
+
+
+    [Fact]
+    public void SaveChanges_WhenOneQueryFails_TransactionIsRolledBack()
+    {
+        // Arrange: Insert a valid user and an invalid query to trigger rollback
+        var queryPatterns = new List<IQueryPattern>
+    {
+        // Valid insert
+        new QueryPattern
+        {
+            Query = "INSERT INTO Users (Name, Email) VALUES (@Name, @Email)",
+            Parameters = new List<Dictionary<string, object>>
+            {
+                new Dictionary<string, object>
+                {
+                    { "@Name", "RollbackTestUser" },
+                    { "@Email", "rollbacktest@example.com" }
+                }
+            }
+        },
+        // Invalid query - table does not exist
+        new QueryPattern
+        {
+            Query = "INSERT INTO InvalidTable (Column) VALUES (@Value)",
+            Parameters = new List<Dictionary<string, object>>
+            {
+                new Dictionary<string, object> { { "@Value", "ShouldFail" } }
+            }
+        }
+    };
+
+        // Act + Assert: should throw exception and rollback
+        Assert.Throws<SqlException>(() => _dataQuery.SaveChanges(queryPatterns));
+
+        // Verify: user should NOT be inserted due to rollback
+        var verifyQuery = "SELECT COUNT(*) FROM Users WHERE Name = @Name";
+        var parameters = new Dictionary<string, string> { { "@Name", "RollbackTestUser" } };
+        var dt = _dataQuery.GetDataTable(verifyQuery, parameters);
+
+        int count = Convert.ToInt32(dt.Rows[0][0]);
+        Assert.Equal(0, count); // Confirm rollback occurred
+    }
+    [Fact]
+    public void SaveChanges_BatchInsert_UsingTableValuedParameter_Works()
+    {
+        // --- Arrange ---
+
+        // Ensure UserTableType exists
+        string typeCheckAndCreate = @"
+        IF NOT EXISTS (SELECT * FROM sys.types WHERE is_table_type = 1 AND name = 'UserTableType')
+        BEGIN
+            CREATE TYPE dbo.UserTableType AS TABLE
+            (
+                Name NVARCHAR(100),
+                Email NVARCHAR(150)
+            );
+        END;";
+
+        // Ensure InsertUsersBatch procedure exists
+        string procCheckAndCreate = @"
+        IF NOT EXISTS (
+            SELECT * FROM sys.objects 
+            WHERE type = 'P' AND name = 'InsertUsersBatch'
+        )
+        BEGIN
+            EXEC('
+                CREATE PROCEDURE InsertUsersBatch
+                    @Users dbo.UserTableType READONLY
+                AS
+                BEGIN
+                    INSERT INTO Users (Name, Email)
+                    SELECT Name, Email FROM @Users;
+                END;
+            ')
+        END;";
+
+        // Execute both setup scripts
+        _dataQuery.ExecuteRawSql(typeCheckAndCreate);
+        _dataQuery.ExecuteRawSql(procCheckAndCreate);
+
+        // Create a table-valued parameter DataTable
+        var userTable = new DataTable();
+        userTable.Columns.Add("Name", typeof(string));
+        userTable.Columns.Add("Email", typeof(string));
+        userTable.Rows.Add("BatchUser1", "batch1@example.com");
+        userTable.Rows.Add("BatchUser2", "batch2@example.com");
+
+        var tvpParam = new SqlParameter
+        {
+            ParameterName = "@Users",
+            SqlDbType = SqlDbType.Structured,
+            TypeName = "dbo.UserTableType",
+            Value = userTable
+        };
+
+        var parameters = new Dictionary<string, object>
+    {
+        { "@Users", tvpParam }
+    };
+
+        var queryPattern = new QueryPattern
+        {
+            Query = "InsertUsersBatch", // Stored Procedure
+            Parameters = new List<Dictionary<string, object>> { parameters }
+        };
+
+        var queryPatterns = new List<IQueryPattern> { queryPattern };
+
+        // --- Act ---
+        var result = _dataQuery.SaveChanges(queryPatterns);
+
+        // --- Assert ---
+        Assert.True(result);
+
+        var verificationQuery = @"
+        SELECT COUNT(*) FROM Users
+        WHERE Name IN ('BatchUser1', 'BatchUser2')
+          AND Email IN ('batch1@example.com', 'batch2@example.com');";
+
+        var verificationTable = _dataQuery.GetDataTable(verificationQuery);
+        int count = Convert.ToInt32(verificationTable.Rows[0][0]);
+        Assert.Equal(2, count);
+    }
+
+
+
+    [Fact]
+    public void SaveChanges_InvalidQuery_ThrowsException()
+    {
+        var queryPatterns = new List<IQueryPattern>
+    {
+        new QueryPattern
+        {
+            Query = "INVALID SQL",
+            Parameters = new List<Dictionary<string, object>>()
+        }
+    };
+
+        Assert.Throws<SqlException>(() => _dataQuery.SaveChanges(queryPatterns));
+    }
+
+    [Fact]
+    public void SaveChanges_NullParameters_DoesNotThrow()
+    {
+        var queryPatterns = new List<IQueryPattern>
+    {
+        new QueryPattern
+        {
+            Query = "INSERT INTO Roles (RoleName) VALUES ('TestLog')",
+            Parameters = null
+        }
+    };
+
+        var result = _dataQuery.SaveChanges(queryPatterns);
+        Assert.True(result);
+    }
+    [Fact]
+    public void SaveChanges_EmptyQueryList_DoesNothing_ReturnsTrue()
+    {
+        var result = _dataQuery.SaveChanges(new List<IQueryPattern>());
+        Assert.True(result);
+    }
+    [Fact]
+    public void SaveChanges_NullQueryList_ThrowsException()
+    {
+        Assert.Throws<NullReferenceException>(() => _dataQuery.SaveChanges(null));
+    }
+
+
+
+
 
 }
