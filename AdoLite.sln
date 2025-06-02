@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.MySql", "AdoLite.My
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.Extension", "AdoLite.Extension\AdoLite.Extension.csproj", "{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdoLite.Tests", "AdoLite.Tests\AdoLite.Tests.csproj", "{AB61C7FD-8728-4DA2-AF05-7DC8530A4504}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +53,10 @@ Global
 		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AB61C7FD-8728-4DA2-AF05-7DC8530A4504}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AB61C7FD-8728-4DA2-AF05-7DC8530A4504}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AB61C7FD-8728-4DA2-AF05-7DC8530A4504}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AB61C7FD-8728-4DA2-AF05-7DC8530A4504}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -62,5 +68,6 @@ Global
 		{CFFF29F6-FBE4-460A-B550-78313CFF2D64} = {4EDF5656-072F-4133-907E-4FA1920995FA}
 		{33815830-ECA5-49D9-9D9F-37AADD95524E} = {4EDF5656-072F-4133-907E-4FA1920995FA}
 		{648ADBC8-8CC3-4301-B80D-60D5F5A17AF1} = {4EDF5656-072F-4133-907E-4FA1920995FA}
+		{AB61C7FD-8728-4DA2-AF05-7DC8530A4504} = {338D67C4-2FE6-4BF7-B909-7D5643EADB26}
 	EndGlobalSection
 EndGlobal
