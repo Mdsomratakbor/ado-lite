@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using AdoLite.Core.Interfaces;
+using System.Data;
+using Newtonsoft.Json;
 
 namespace AdoLite.SqlServer
 {
@@ -66,5 +68,34 @@ namespace AdoLite.SqlServer
                 throw;
             }
         }
+
+        public async Task BulkInsertAsync<T>(string tableName, List<T> dataList)
+        {
+            var table = ToDataTable(dataList);
+            await BulkInsertAsync(tableName, table);
+        }
+
+        public async Task BulkInsertAsync(string tableName, DataTable dataTable)
+        {
+            using (var bulkCopy = new SqlBulkCopy(_connection))
+            {
+                bulkCopy.DestinationTableName = tableName;
+                await bulkCopy.WriteToServerAsync(dataTable);
+            }
+        }
+
+        public async Task BulkInsertFromCsvAsync(string tableName, string csvFilePath)
+        {
+            var table = CsvToDataTable(csvFilePath);
+            await BulkInsertAsync(tableName, table);
+        }
+
+        public async Task BulkInsertFromJsonAsync<T>(string tableName, string jsonFilePath)
+        {
+            var jsonData = await File.ReadAllTextAsync(jsonFilePath);
+            var dataList = JsonConvert.DeserializeObject<List<T>>(jsonData);
+            await BulkInsertAsync(tableName, ToDataTable(dataList));
+        }
+
     }
 }

@@ -90,5 +90,79 @@ namespace AdoLite.MySql
                 cmd.ExecuteNonQuery();
             }
         }
+
+        public void BulkInsert(string tableName, DataTable dataTable)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void BulkInsert<T>(string tableName, List<T> dataList)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void BulkInsertFromJson<T>(string tableName, string jsonFilePath)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void BulkInsertFromCsv(string tableName, string csvFilePath)
+        {
+            throw new NotImplementedException();
+        }
+
+        private DataTable ToDataTable<T>(List<T> data)
+        {
+            var dataTable = new DataTable(typeof(T).Name);
+            var properties = typeof(T).GetProperties();
+
+            foreach (var prop in properties)
+            {
+                dataTable.Columns.Add(prop.Name, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
+            }
+
+            foreach (var item in data)
+            {
+                var values = new object[properties.Length];
+                for (int i = 0; i < properties.Length; i++)
+                {
+                    values[i] = properties[i].GetValue(item);
+                }
+                dataTable.Rows.Add(values);
+            }
+
+            return dataTable;
+        }
+
+        private DataTable CsvToDataTable(string csvFilePath)
+        {
+            var dt = new DataTable();
+            using (var reader = new StreamReader(csvFilePath))
+            {
+                bool isHeader = true;
+                string[] headers = null;
+
+                while (!reader.EndOfStream)
+                {
+                    var line = reader.ReadLine();
+                    var values = line.Split(',');
+
+                    if (isHeader)
+                    {
+                        headers = values;
+                        foreach (var header in headers)
+                        {
+                            dt.Columns.Add(header);
+                        }
+                        isHeader = false;
+                    }
+                    else
+                    {
+                        dt.Rows.Add(values);
+                    }
+                }
+            }
+            return dt;
+        }
     }
 }

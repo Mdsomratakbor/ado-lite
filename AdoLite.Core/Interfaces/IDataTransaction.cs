@@ -35,5 +35,34 @@ namespace AdoLite.Core.Interfaces
         /// </summary>
         /// <param name="query">The raw SQL command to execute.</param>
         void ExecuteRawSql(string query);
+        /// <summary>
+        /// Performs a bulk insert into the specified table using a DataTable.
+        /// </summary>
+        /// <param name="tableName">Target table name.</param>
+        /// <param name="dataTable">DataTable containing rows to insert.</param>
+        void BulkInsert(string tableName, DataTable dataTable);
+
+        /// <summary>
+        /// Performs a bulk insert into the specified table using a list of typed objects.
+        /// </summary>
+        /// <typeparam name="T">Type of object.</typeparam>
+        /// <param name="tableName">Target table name.</param>
+        /// <param name="dataList">List of objects to insert.</param>
+        void BulkInsert<T>(string tableName, List<T> dataList);
+
+        /// <summary>
+        /// Performs a bulk insert into the specified table from a JSON file.
+        /// </summary>
+        /// <typeparam name="T">Type of object.</typeparam>
+        /// <param name="tableName">Target table name.</param>
+        /// <param name="jsonFilePath">Path to the JSON file.</param>
+        void BulkInsertFromJson<T>(string tableName, string jsonFilePath);
+
+        /// <summary>
+        /// Performs a bulk insert into the specified table from a CSV file.
+        /// </summary>
+        /// <param name="tableName">Target table name.</param>
+        /// <param name="csvFilePath">Path to the CSV file.</param>
+        void BulkInsertFromCsv(string tableName, string csvFilePath);
     }
 }

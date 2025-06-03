@@ -32,5 +32,29 @@ namespace AdoLite.Core.Interfaces
              int commandTimeoutSeconds = 30,
             CancellationToken cancellationToken = default
            );
+
+
+        /// <summary>
+        /// Performs a bulk insert into the specified table using a DataTable asynchronously.
+        /// </summary>
+        Task BulkInsertAsync(string tableName, DataTable dataTable);
+
+
+        /// <summary>
+        /// Performs a bulk insert into the specified table using a list of typed objects asynchronously.
+        /// </summary>
+        Task BulkInsertAsync<T>(string tableName, List<T> dataList);
+
+
+        /// <summary>
+        /// Performs a bulk insert into the specified table from a JSON file asynchronously.
+        /// </summary>
+        Task BulkInsertFromJsonAsync<T>(string tableName, string jsonFilePath);
+
+
+        /// <summary>
+        /// Performs a bulk insert into the specified table from a CSV file asynchronously.
+        /// </summary>
+        Task BulkInsertFromCsvAsync(string tableName, string csvFilePath);
     }
 }

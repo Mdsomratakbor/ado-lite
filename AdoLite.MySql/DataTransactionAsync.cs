@@ -4,11 +4,31 @@ using System.Threading;
 using System.Threading.Tasks;
 using MySql.Data.MySqlClient;
 using AdoLite.Core.Interfaces;
+using System.Data;
 
 namespace AdoLite.MySql
 {
     public partial class DataQuery : IDataTransactionAsync
     {
+        public Task BulkInsertAsync(string tableName, DataTable dataTable)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task BulkInsertAsync<T>(string tableName, List<T> dataList)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task BulkInsertFromCsvAsync(string tableName, string csvFilePath)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task BulkInsertFromJsonAsync<T>(string tableName, string jsonFilePath)
+        {
+            throw new NotImplementedException();
+        }
 
 
         /// <summary>

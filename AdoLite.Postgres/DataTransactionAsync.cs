@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,6 +11,31 @@ namespace AdoLite.Postgres
 {
     public partial class DataQuery : IDataTransactionAsync
     {
+        public void BulkInsert<T>(string tableName, List<T> dataList)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task BulkInsertAsync(string tableName, DataTable dataTable)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task BulkInsertAsync<T>(string tableName, List<T> dataList)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task BulkInsertFromCsvAsync(string tableName, string csvFilePath)
+        {
+            throw new NotImplementedException();
+        }
+
+     
+        public Task BulkInsertFromJsonAsync<T>(string tableName, string jsonFilePath)
+        {
+            throw new NotImplementedException();
+        }
 
         /// <summary>
         /// Executes a series of database queries within a transaction and commits them.

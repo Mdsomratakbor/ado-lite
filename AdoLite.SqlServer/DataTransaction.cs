@@ -4,6 +4,7 @@ using System.Data;
 using Microsoft.Data.SqlClient;
 using AdoLite.Core.Base;
 using AdoLite.Core.Interfaces;
+using Newtonsoft.Json;
 
 namespace AdoLite.SqlServer
 {
@@ -114,6 +115,95 @@ namespace AdoLite.SqlServer
                 cmd.CommandText = query;
                 cmd.ExecuteNonQuery();
             }
+        }
+
+
+        public void BulkInsert(string tableName, DataTable dataTable)
+        {
+            using (var bulkCopy = new SqlBulkCopy(_connection))
+            {
+                bulkCopy.DestinationTableName = tableName;
+                bulkCopy.WriteToServer(dataTable);
+            }
+        }
+
+    
+        public void BulkInsert<T>(string tableName, List<T> dataList)
+        {
+            var table = ToDataTable(dataList);
+            BulkInsert(tableName, table);
+        }
+
+     
+
+        public void BulkInsertFromJson<T>(string tableName, string jsonFilePath)
+        {
+            var jsonData = File.ReadAllText(jsonFilePath);
+            var dataList = JsonConvert.DeserializeObject<List<T>>(jsonData);
+            BulkInsert(tableName, ToDataTable(dataList));
+        }
+
+    
+        public void BulkInsertFromCsv(string tableName, string csvFilePath)
+        {
+            var table = CsvToDataTable(csvFilePath);
+            BulkInsert(tableName, table);
+        }
+
+      
+
+        private DataTable ToDataTable<T>(List<T> data)
+        {
+            var dataTable = new DataTable(typeof(T).Name);
+            var properties = typeof(T).GetProperties();
+
+            foreach (var prop in properties)
+            {
+                dataTable.Columns.Add(prop.Name, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
+            }
+
+            foreach (var item in data)
+            {
+                var values = new object[properties.Length];
+                for (int i = 0; i < properties.Length; i++)
+                {
+                    values[i] = properties[i].GetValue(item);
+                }
+                dataTable.Rows.Add(values);
+            }
+
+            return dataTable;
+        }
+
+        private DataTable CsvToDataTable(string csvFilePath)
+        {
+            var dt = new DataTable();
+            using (var reader = new StreamReader(csvFilePath))
+            {
+                bool isHeader = true;
+                string[] headers = null;
+
+                while (!reader.EndOfStream)
+                {
+                    var line = reader.ReadLine();
+                    var values = line.Split(',');
+
+                    if (isHeader)
+                    {
+                        headers = values;
+                        foreach (var header in headers)
+                        {
+                            dt.Columns.Add(header);
+                        }
+                        isHeader = false;
+                    }
+                    else
+                    {
+                        dt.Rows.Add(values);
+                    }
+                }
+            }
+            return dt;
         }
     }
 }
