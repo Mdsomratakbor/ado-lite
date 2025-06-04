@@ -919,7 +919,7 @@ public class DataQueryIntegrationTests : IDisposable
 
         var queryPattern = new QueryPattern
         {
-            Query = "InsertUsersBatch", // Stored Procedure
+            Query = "Exec InsertUsersBatch @Users", // Stored Procedure
             Parameters = new List<Dictionary<string, object>> { parameters }
         };
 
