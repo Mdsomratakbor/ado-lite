@@ -162,5 +162,113 @@ namespace AdoLite.Postgres
                 throw ex;  // Rethrow the exception for handling at a higher level
             }
         }
+
+
+        /// <summary>
+        /// Retrieves a single record asynchronously, mapped to type T.
+        /// </summary>
+        public virtual async Task<T> GetSingleRecordAsync<T>(string query, Dictionary<string, string> parameters = null) where T : new()
+        {
+            var dt = await GetDataTableAsync(query, parameters);
+            if (dt.Rows.Count == 0)
+                return default;
+
+            var row = dt.Rows[0];
+            T obj = new T();
+            foreach (var prop in typeof(T).GetProperties())
+            {
+                if (dt.Columns.Contains(prop.Name) && row[prop.Name] != DBNull.Value)
+                {
+                    prop.SetValue(obj, Convert.ChangeType(row[prop.Name], prop.PropertyType));
+                }
+            }
+            return obj;
+        }
+
+        /// <summary>
+        /// Retrieves a list of values from a single column asynchronously.
+        /// </summary>
+        public virtual async Task<List<T>> GetListAsync<T>(string query, Dictionary<string, string> parameters = null)
+        {
+            var dt = await GetDataTableAsync(query, parameters);
+            var list = new List<T>();
+            if (dt.Columns.Count == 0) return list;
+
+            foreach (DataRow row in dt.Rows)
+            {
+                if (row[0] != DBNull.Value)
+                    list.Add((T)Convert.ChangeType(row[0], typeof(T)));
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Retrieves count asynchronously.
+        /// </summary>
+        public virtual async Task<int> GetCountAsync(string query, Dictionary<string, string> parameters = null)
+        {
+            return await GetSingleValueAsync<int>(query, parameters);
+        }
+
+        /// <summary>
+        /// Checks existence asynchronously.
+        /// </summary>
+        public virtual async Task<bool> ExistsAsync(string query, Dictionary<string, string> parameters = null)
+        {
+            var count = await GetSingleValueAsync<int>(query, parameters);
+            return count > 0;
+        }
+
+        /// <summary>
+        /// Retrieves a paged DataTable asynchronously.
+        /// </summary>
+        public virtual async Task<DataTable> GetPagedDataTableAsync(string query, Dictionary<string, string> parameters, int pageNumber, int pageSize)
+        {
+            // For PostgreSQL, use LIMIT and OFFSET syntax
+            string pagedQuery = $@"
+                {query}
+                LIMIT {pageSize} OFFSET {(pageNumber - 1) * pageSize}";
+
+            return await GetDataTableAsync(pagedQuery, parameters);
+        }
+
+        /// <summary>
+        /// Retrieves a dictionary asynchronously.
+        /// </summary>
+        public virtual async Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null)
+        {
+            var dt = await GetDataTableAsync(query, parameters);
+            var dict = new Dictionary<TKey, TValue>();
+
+            if (dt.Columns.Count < 2)
+                return dict;
+
+            foreach (DataRow row in dt.Rows)
+            {
+                if (row[0] != DBNull.Value && row[1] != DBNull.Value)
+                {
+                    TKey key = (TKey)Convert.ChangeType(row[0], typeof(TKey));
+                    TValue value = (TValue)Convert.ChangeType(row[1], typeof(TValue));
+                    dict[key] = value;
+                }
+            }
+            return dict;
+        }
+
+        /// <summary>
+        /// Retrieves a list of mapped objects asynchronously.
+        /// </summary>
+        public virtual async Task<List<T>> GetMappedListAsync<T>(string query, Func<DataRow, T> mapFunc, Dictionary<string, string> parameters = null)
+        {
+            var dt = await GetDataTableAsync(query, parameters);
+            var list = new List<T>();
+
+            foreach (DataRow row in dt.Rows)
+            {
+                list.Add(mapFunc(row));
+            }
+
+            return list;
+        }
     }
 }
