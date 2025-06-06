@@ -5,6 +5,7 @@ using AdoLite.Postgres;
 using AdoLite.Core.Services;
 using AdoLite.SqlServer;
 using AdoLite.MySql;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 
 namespace AdoLite.Extension
@@ -19,7 +20,12 @@ namespace AdoLite.Extension
         {
 
             // Register dependencies first
-            services.Add(new ServiceDescriptor(typeof(IDataJSONServices), typeof(DataJSONServices), lifetime));
+            //services.Add(new ServiceDescriptor(typeof(IDataJSONServices), typeof(DataJSONServices), lifetime));
+
+            // Hack: Allow fallback registration of IDataJSONServices only if not already registered.
+            // This enables unit tests or other consumers to inject mock implementations before calling this method.
+            services.TryAdd(new ServiceDescriptor(typeof(IDataJSONServices), typeof(DataJSONServices), lifetime));
+
             // TODO: Register other dependencies like IDataQueryAsync, IDataTransaction, etc.
 
             Func<IServiceProvider, IDataContext> implementationFactory = providerType switch

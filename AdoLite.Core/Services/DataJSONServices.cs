@@ -10,7 +10,7 @@ using Newtonsoft.Json;
 
 namespace AdoLite.Core.Services
 {
-    public abstract class DataJSONServices : IDataJSONServices
+    public class DataJSONServices : IDataJSONServices
     {
         public virtual string DataTableToJSON(DataTable dataTable)
         {
