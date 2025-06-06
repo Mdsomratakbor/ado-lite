@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using AdoLite.Core.Interfaces;
 using Npgsql;
@@ -14,162 +13,121 @@ namespace AdoLite.Postgres
         /// <summary>
         /// Retrieves a single row from the database as a DataRow.
         /// </summary>
-        /// <param name="query">SQL query string.</param>
-        /// <param name="parameter">Optional dictionary of parameters for the query.</param>
-        /// <returns>A DataRow containing the result of the query.</returns>
-        public virtual async Task<DataRow> GetDataRowAsync(string query, Dictionary<string, string> parameter = null)
+        public virtual async Task<DataRow> GetDataRowAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
-            try
-            {
-
-                using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection))
-                {
-                    // Add parameters to the data adapter if provided
-                    if (parameter != null && parameter.Count > 0)
-                    {
-                        foreach (var item in parameter)
-                        {
-                            dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-                        }
-                    }
-
-                    // Fill the DataTable with the query results
-                    DataTable dataTable = new DataTable();
-                    await Task.Run(() => dataAdapter.Fill(dataTable));
-
-                    // Return the first row of the DataTable
-                    if (dataTable.Rows.Count > 0)
-                        return dataTable.Rows[0];
-
-                    return null;  // Return null if no rows were found
-                }
-
-            }
-            catch (Exception ex)
-            {
-                throw ex;  // Rethrow the exception for handling at a higher level
-            }
+            var dt = await GetDataTableAsync(query, parameter, cancellationToken);
+            if (dt.Rows.Count > 0)
+                return dt.Rows[0];
+            return null;
         }
 
         /// <summary>
         /// Retrieves a DataSet from the database.
+        /// Note: Cancellation token support is limited due to NpgsqlDataAdapter.Fill lacking async overloads.
         /// </summary>
-        /// <param name="query">SQL query string.</param>
-        /// <param name="parameter">Optional dictionary of parameters for the query.</param>
-        /// <returns>A DataSet containing the query results.</returns>
-        public virtual async Task<DataSet> GetDataSetAsync(string query, Dictionary<string, string> parameter = null)
+        public virtual async Task<DataSet> GetDataSetAsync(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            try
-            {
-              
-                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection))
-                    {
-                        // Add parameters to the data adapter if provided
-                        if (parameter != null && parameter.Count > 0)
-                        {
-                            foreach (var item in parameter)
-                            {
-                                dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-                            }
-                        }
+            var dataSet = new DataSet();
+            using var cmd = new NpgsqlCommand(query, _connection);
 
-                        // Fill the DataSet with the query results
-                        DataSet dataSet = new DataSet();
-                        await Task.Run(() => dataAdapter.Fill(dataSet));
-                        return dataSet;
-                    }
-                
-            }
-            catch (Exception ex)
+            if (parameters != null)
             {
-                throw ex;  // Rethrow the exception for handling at a higher level
+                foreach (var p in parameters)
+                    cmd.Parameters.AddWithValue(p.Key, p.Value);
             }
+
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
+            do
+            {
+                var dt = new DataTable();
+                dt.Load(reader);
+                dataSet.Tables.Add(dt);
+            } while (!reader.IsClosed && await reader.NextResultAsync(cancellationToken));
+
+            return dataSet;
         }
+
 
         /// <summary>
         /// Retrieves a DataTable from the database.
         /// </summary>
-        /// <param name="query">SQL query string.</param>
-        /// <param name="parameter">Optional dictionary of parameters for the query.</param>
-        /// <returns>A DataTable containing the query results.</returns>
-        public virtual async Task<DataTable> GetDataTableAsync(string query, Dictionary<string, string> parameter = null)
+        public virtual async Task<DataTable> GetDataTableAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
             try
             {
-              
-                    using (NpgsqlDataAdapter dataAdapter = new NpgsqlDataAdapter(query, _connection))
+                using (var cmd = new NpgsqlCommand(query, _connection))
+                {
+                    if (parameter != null && parameter.Count > 0)
                     {
-                        // Add parameters to the data adapter if provided
-                        if (parameter != null && parameter.Count > 0)
+                        foreach (var item in parameter)
                         {
-                            foreach (var item in parameter)
-                            {
-                                dataAdapter.SelectCommand.Parameters.AddWithValue(item.Key, item.Value);
-                            }
+                            cmd.Parameters.AddWithValue(item.Key, item.Value);
                         }
+                    }
 
-                        // Fill the DataTable with the query results
-                        DataTable dt = new DataTable();
-                        await Task.Run(() => dataAdapter.Fill(dt));
+                    using (var reader = await cmd.ExecuteReaderAsync(cancellationToken))
+                    {
+                        var dt = new DataTable();
+                        dt.Load(reader);
                         return dt;
                     }
+                }
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                throw ex;  // Rethrow the exception for handling at a higher level
+                throw; // Propagate cancellation
+            }
+            catch (Exception)
+            {
+                throw;
             }
         }
 
         /// <summary>
         /// Retrieves a single column value from the database as a specific type (T).
         /// </summary>
-        /// <typeparam name="T">The type to which the result should be cast.</typeparam>
-        /// <param name="query">SQL query string.</param>
-        /// <param name="parameter">Optional dictionary of parameters for the query.</param>
-        /// <returns>The value of the first column in the first row, cast to type T.</returns>
-        public virtual async Task<T> GetSingleValueAsync<T>(string query, Dictionary<string, string> parameter = null)
+        public virtual async Task<T> GetSingleValueAsync<T>(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
             try
             {
-                var data = "";  // Variable to hold the retrieved data
-                    using (NpgsqlCommand cmd = new NpgsqlCommand(query, _connection))
+                using (var cmd = new NpgsqlCommand(query, _connection))
+                {
+                    if (parameter != null && parameter.Count > 0)
                     {
-                        // Add parameters to the command if provided
-                        if (parameter != null && parameter.Count > 0)
+                        foreach (var item in parameter)
                         {
-                            foreach (var item in parameter)
-                            {
-                                cmd.Parameters.AddWithValue(item.Key, item.Value);
-                            }
-                        }
-
-                        // Execute the query and read the result
-                        using (var reader = await cmd.ExecuteReaderAsync())
-                        {
-                            if (reader.HasRows)
-                            {
-                                while (await reader.ReadAsync())  // Read data from the result set
-                                {
-                                    data = Convert.ToString(reader[0]);  // Get the first column
-                                }
-                            }
+                            cmd.Parameters.AddWithValue(item.Key, item.Value);
                         }
                     }
-                return (T)Convert.ChangeType(data, typeof(T));  // Convert the result to the specified type
+
+                    using (var reader = await cmd.ExecuteReaderAsync(cancellationToken))
+                    {
+                        if (await reader.ReadAsync(cancellationToken))
+                        {
+                            var data = reader.IsDBNull(0) ? default(T) : (T)Convert.ChangeType(reader[0], typeof(T));
+                            return data;
+                        }
+                    }
+                }
+                return default;
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                throw ex;  // Rethrow the exception for handling at a higher level
+                throw;
+            }
+            catch (Exception)
+            {
+                throw;
             }
         }
-
 
         /// <summary>
         /// Retrieves a single record asynchronously, mapped to type T.
         /// </summary>
-        public virtual async Task<T> GetSingleRecordAsync<T>(string query, Dictionary<string, string> parameters = null) where T : new()
+        public virtual async Task<T> GetSingleRecordAsync<T>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default) where T : new()
         {
-            var dt = await GetDataTableAsync(query, parameters);
+            var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             if (dt.Rows.Count == 0)
                 return default;
 
@@ -188,9 +146,9 @@ namespace AdoLite.Postgres
         /// <summary>
         /// Retrieves a list of values from a single column asynchronously.
         /// </summary>
-        public virtual async Task<List<T>> GetListAsync<T>(string query, Dictionary<string, string> parameters = null)
+        public virtual async Task<List<T>> GetListAsync<T>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            var dt = await GetDataTableAsync(query, parameters);
+            var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             var list = new List<T>();
             if (dt.Columns.Count == 0) return list;
 
@@ -205,39 +163,39 @@ namespace AdoLite.Postgres
         /// <summary>
         /// Retrieves count asynchronously.
         /// </summary>
-        public virtual async Task<int> GetCountAsync(string query, Dictionary<string, string> parameters = null)
+        public virtual async Task<int> GetCountAsync(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            return await GetSingleValueAsync<int>(query, parameters);
+            return await GetSingleValueAsync<int>(query, parameters, cancellationToken);
         }
 
         /// <summary>
         /// Checks existence asynchronously.
         /// </summary>
-        public virtual async Task<bool> ExistsAsync(string query, Dictionary<string, string> parameters = null)
+        public virtual async Task<bool> ExistsAsync(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            var count = await GetSingleValueAsync<int>(query, parameters);
+            var count = await GetSingleValueAsync<int>(query, parameters, cancellationToken);
             return count > 0;
         }
 
         /// <summary>
         /// Retrieves a paged DataTable asynchronously.
         /// </summary>
-        public virtual async Task<DataTable> GetPagedDataTableAsync(string query, Dictionary<string, string> parameters, int pageNumber, int pageSize)
+        public virtual async Task<DataTable> GetPagedDataTableAsync(string query, Dictionary<string, string> parameters, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {
             // For PostgreSQL, use LIMIT and OFFSET syntax
             string pagedQuery = $@"
                 {query}
                 LIMIT {pageSize} OFFSET {(pageNumber - 1) * pageSize}";
 
-            return await GetDataTableAsync(pagedQuery, parameters);
+            return await GetDataTableAsync(pagedQuery, parameters, cancellationToken);
         }
 
         /// <summary>
         /// Retrieves a dictionary asynchronously.
         /// </summary>
-        public virtual async Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null)
+        public virtual async Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            var dt = await GetDataTableAsync(query, parameters);
+            var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             var dict = new Dictionary<TKey, TValue>();
 
             if (dt.Columns.Count < 2)
@@ -258,9 +216,9 @@ namespace AdoLite.Postgres
         /// <summary>
         /// Retrieves a list of mapped objects asynchronously.
         /// </summary>
-        public virtual async Task<List<T>> GetMappedListAsync<T>(string query, Func<DataRow, T> mapFunc, Dictionary<string, string> parameters = null)
+        public virtual async Task<List<T>> GetMappedListAsync<T>(string query, Func<DataRow, T> mapFunc, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            var dt = await GetDataTableAsync(query, parameters);
+            var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             var list = new List<T>();
 
             foreach (DataRow row in dt.Rows)

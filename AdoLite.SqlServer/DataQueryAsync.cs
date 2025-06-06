@@ -12,7 +12,7 @@ namespace AdoLite.SqlServer
         /// <summary>
         /// Retrieves a single row from the database as a DataRow asynchronously.
         /// </summary>
-        public virtual async Task<DataRow> GetDataRowAsync(string query, Dictionary<string, string> parameter = null)
+        public virtual async Task<DataRow> GetDataRowAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -28,7 +28,7 @@ namespace AdoLite.SqlServer
                         }
 
 
-                        using (SqlDataReader reader = await command.ExecuteReaderAsync())
+                        using (SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
                         {
                             DataTable dt = new DataTable();
                             dt.Load(reader);
@@ -50,12 +50,11 @@ namespace AdoLite.SqlServer
         /// <summary>
         /// Retrieves a DataSet asynchronously from the database.
         /// </summary>
-        public virtual async Task<DataSet> GetDataSetAsync(string query, Dictionary<string, string> parameter = null)
+        public virtual async Task<DataSet> GetDataSetAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
             try
             {
-                using (SqlCommand command = new SqlCommand(query, _connection))
-                using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+                using (var command = new SqlCommand(query, _connection))
                 {
                     if (parameter != null)
                     {
@@ -65,29 +64,36 @@ namespace AdoLite.SqlServer
                         }
                     }
 
-                    DataSet ds = new DataSet();
-
-                    // SqlDataAdapter.Fill is synchronous, so use Task.Run to avoid blocking.
-                    await Task.Run(() => adapter.Fill(ds));
-
-                    return ds;
+                    using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+                    {
+                        var ds = new DataSet();
+                        var dt = new DataTable();
+                        dt.Load(reader);  // Load synchronously from reader (fast in-memory)
+                        ds.Tables.Add(dt);
+                        return ds;
+                    }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Handle cancellation specifically if needed
+                throw;
             }
             catch (Exception)
             {
                 throw;
             }
         }
+
 
         /// <summary>
         /// Retrieves a DataTable asynchronously from the database.
         /// </summary>
-        public virtual async Task<DataTable> GetDataTableAsync(string query, Dictionary<string, string> parameter = null)
+        public virtual async Task<DataTable> GetDataTableAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
             try
             {
-                using (SqlCommand command = new SqlCommand(query, _connection))
-                using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+                using (var command = new SqlCommand(query, _connection))
                 {
                     if (parameter != null)
                     {
@@ -97,10 +103,18 @@ namespace AdoLite.SqlServer
                         }
                     }
 
-                    DataTable dt = new DataTable();
-                    await Task.Run(() => adapter.Fill(dt));
-                    return dt;
+                    using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+                    {
+                        var dt = new DataTable();
+                        dt.Load(reader); // Load synchronously but fast, after async read
+                        return dt;
+                    }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Handle cancellation if needed (e.g., log, cleanup)
+                throw;
             }
             catch (Exception)
             {
@@ -108,10 +122,11 @@ namespace AdoLite.SqlServer
             }
         }
 
+
         /// <summary>
         /// Retrieves a single scalar value asynchronously.
         /// </summary>
-        public virtual async Task<T> GetSingleValueAsync<T>(string query, Dictionary<string, string> parameter = null)
+        public virtual async Task<T> GetSingleValueAsync<T>(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -125,7 +140,7 @@ namespace AdoLite.SqlServer
                         }
                     }
 
-                    object result = await command.ExecuteScalarAsync();
+                    object result = await command.ExecuteScalarAsync(cancellationToken);
 
                     if (result != null && result != DBNull.Value)
                         return (T)Convert.ChangeType(result, typeof(T));
@@ -141,9 +156,9 @@ namespace AdoLite.SqlServer
         /// <summary>
         /// Retrieves a single record asynchronously, mapped to type T.
         /// </summary>
-        public virtual async Task<T> GetSingleRecordAsync<T>(string query, Dictionary<string, string> parameters = null) where T : new()
+        public virtual async Task<T> GetSingleRecordAsync<T>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default) where T : new()
         {
-            var dt = await GetDataTableAsync(query, parameters);
+            var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             if (dt.Rows.Count == 0)
                 return default;
 
@@ -162,9 +177,9 @@ namespace AdoLite.SqlServer
         /// <summary>
         /// Retrieves a list of values from a single column asynchronously.
         /// </summary>
-        public virtual async Task<List<T>> GetListAsync<T>(string query, Dictionary<string, string> parameters = null)
+        public virtual async Task<List<T>> GetListAsync<T>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            var dt = await GetDataTableAsync(query, parameters);
+            var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             var list = new List<T>();
             if (dt.Columns.Count == 0) return list;
 
@@ -179,24 +194,24 @@ namespace AdoLite.SqlServer
         /// <summary>
         /// Retrieves count asynchronously.
         /// </summary>
-        public virtual async Task<int> GetCountAsync(string query, Dictionary<string, string> parameters = null)
+        public virtual async Task<int> GetCountAsync(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            return await GetSingleValueAsync<int>(query, parameters);
+            return await GetSingleValueAsync<int>(query, parameters, cancellationToken);
         }
 
         /// <summary>
         /// Checks existence asynchronously.
         /// </summary>
-        public virtual async Task<bool> ExistsAsync(string query, Dictionary<string, string> parameters = null)
+        public virtual async Task<bool> ExistsAsync(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            var count = await GetSingleValueAsync<int>(query, parameters);
+            var count = await GetSingleValueAsync<int>(query, parameters, cancellationToken);
             return count > 0;
         }
 
         /// <summary>
         /// Retrieves a paged DataTable asynchronously.
         /// </summary>
-        public virtual async Task<DataTable> GetPagedDataTableAsync(string query, Dictionary<string, string> parameters, int pageNumber, int pageSize)
+        public virtual async Task<DataTable> GetPagedDataTableAsync(string query, Dictionary<string, string> parameters, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {
             // Example of applying paging logic in SQL Server using OFFSET-FETCH
             string pagedQuery = $@"
@@ -204,15 +219,15 @@ namespace AdoLite.SqlServer
                 OFFSET {(pageNumber - 1) * pageSize} ROWS
                 FETCH NEXT {pageSize} ROWS ONLY";
 
-            return await GetDataTableAsync(pagedQuery, parameters);
+            return await GetDataTableAsync(pagedQuery, parameters, cancellationToken);
         }
 
         /// <summary>
         /// Retrieves a dictionary asynchronously.
         /// </summary>
-        public virtual async Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null)
+        public virtual async Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            var dt = await GetDataTableAsync(query, parameters);
+            var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             var dict = new Dictionary<TKey, TValue>();
 
             if (dt.Columns.Count < 2)
@@ -233,9 +248,9 @@ namespace AdoLite.SqlServer
         /// <summary>
         /// Retrieves a list of mapped objects asynchronously.
         /// </summary>
-        public virtual async Task<List<T>> GetMappedListAsync<T>(string query, Func<DataRow, T> mapFunc, Dictionary<string, string> parameters = null)
+        public virtual async Task<List<T>> GetMappedListAsync<T>(string query, Func<DataRow, T> mapFunc, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
-            var dt = await GetDataTableAsync(query, parameters);
+            var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             var list = new List<T>();
 
             foreach (DataRow row in dt.Rows)
