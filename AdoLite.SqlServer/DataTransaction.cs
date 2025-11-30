@@ -70,7 +70,15 @@ namespace AdoLite.SqlServer
 
                                 if (value is SqlParameter sqlParam)
                                 {
-                                    value = sqlParam.Value ?? DBNull.Value;
+                                    var p = cmd.Parameters.Add(sqlParam.ParameterName ?? param.Key, sqlParam.SqlDbType);
+                                    if (!string.IsNullOrWhiteSpace(sqlParam.TypeName))
+                                    {
+                                        p.TypeName = sqlParam.TypeName;
+                                    }
+                                    p.Direction = sqlParam.Direction;
+                                    p.Size = sqlParam.Size;
+                                    p.Value = sqlParam.Value ?? DBNull.Value;
+                                    continue;
                                 }
 
                                 cmd.Parameters.AddWithValue(param.Key, value ?? DBNull.Value);

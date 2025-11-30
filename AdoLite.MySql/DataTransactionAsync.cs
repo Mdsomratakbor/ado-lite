@@ -65,7 +65,17 @@ namespace AdoLite.MySql
                         {
                             foreach (var param in parameterDict)
                             {
-                                cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                                if (param.Value is MySqlParameter myParam)
+                                {
+                                    var p = cmd.Parameters.Add(myParam.ParameterName ?? param.Key, myParam.MySqlDbType);
+                                    p.Direction = myParam.Direction;
+                                    p.Size = myParam.Size;
+                                    p.Value = myParam.Value ?? DBNull.Value;
+                                }
+                                else
+                                {
+                                    cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                                }
                             }
                         }
                     }

@@ -67,7 +67,21 @@ namespace AdoLite.Postgres
                             {
                                 foreach (var item in parameter)
                                 {
-                                    cmd.Parameters.AddWithValue(item.Key, item.Value); // Add parameters to the command
+                                    if (item.Value is NpgsqlParameter npgsqlParam)
+                                    {
+                                        var p = cmd.Parameters.Add(npgsqlParam.ParameterName ?? item.Key, npgsqlParam.NpgsqlDbType);
+                                        if (!string.IsNullOrWhiteSpace(npgsqlParam.DataTypeName))
+                                        {
+                                            p.DataTypeName = npgsqlParam.DataTypeName;
+                                        }
+                                        p.Direction = npgsqlParam.Direction;
+                                        p.Size = npgsqlParam.Size;
+                                        p.Value = npgsqlParam.Value ?? DBNull.Value;
+                                    }
+                                    else
+                                    {
+                                        cmd.Parameters.AddWithValue(item.Key, item.Value ?? DBNull.Value);
+                                    }
                                 }
                             }
                         }

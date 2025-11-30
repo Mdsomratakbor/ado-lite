@@ -42,16 +42,30 @@ namespace AdoLite.SqlServer
                         cmd.CommandText = data.Query;
                         cmd.Parameters.Clear();
 
-                        if (data.Parameters != null && data.Parameters.Count > 0)
+                    if (data.Parameters != null && data.Parameters.Count > 0)
+                    {
+                        foreach (var parameterDict in data.Parameters)
                         {
-                            foreach (var parameterDict in data.Parameters)
+                            foreach (var param in parameterDict)
                             {
-                                foreach (var param in parameterDict)
+                                if (param.Value is SqlParameter sqlParam)
+                                {
+                                    var p = cmd.Parameters.Add(sqlParam.ParameterName ?? param.Key, sqlParam.SqlDbType);
+                                    if (!string.IsNullOrWhiteSpace(sqlParam.TypeName))
+                                    {
+                                        p.TypeName = sqlParam.TypeName;
+                                    }
+                                    p.Direction = sqlParam.Direction;
+                                    p.Size = sqlParam.Size;
+                                    p.Value = sqlParam.Value ?? DBNull.Value;
+                                }
+                                else
                                 {
                                     cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
                                 }
                             }
                         }
+                    }
 
                         await cmd.ExecuteNonQueryAsync(cancellationToken);
                     }

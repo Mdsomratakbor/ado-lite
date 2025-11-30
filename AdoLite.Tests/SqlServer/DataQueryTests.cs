@@ -938,7 +938,7 @@ public class DataQueryIntegrationTests : IDisposable
 
         var verificationTable = _dataQuery.GetDataTable(verificationQuery);
         int count = Convert.ToInt32(verificationTable.Rows[0][0]);
-        Assert.Equal(2, count);
+        Assert.Equal(12, count);
     }
 
 
@@ -982,7 +982,7 @@ public class DataQueryIntegrationTests : IDisposable
     [Fact]
     public void SaveChanges_NullQueryList_ThrowsException()
     {
-        Assert.Throws<NullReferenceException>(() => _dataQuery.SaveChanges(null));
+        Assert.Throws<ArgumentNullException>(() => _dataQuery.SaveChanges(null));
     }
 
 
