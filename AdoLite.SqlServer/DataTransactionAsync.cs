@@ -1,9 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
-using AdoLite.Core.Interfaces;
 using System.Data;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using AdoLite.Core.Interfaces;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace AdoLite.SqlServer
@@ -20,51 +25,66 @@ namespace AdoLite.SqlServer
         int commandTimeoutSeconds = 30,
         CancellationToken cancellationToken = default)
         {
+            if (queryPatterns == null) throw new ArgumentNullException(nameof(queryPatterns));
+
+            await using var connection = CreateAndOpenConnection();
+            await using SqlTransaction transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+            var sw = Stopwatch.StartNew();
             try
             {
+                await using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandTimeout = commandTimeoutSeconds;
 
-                    await using var transaction = (SqlTransaction)await _connection.BeginTransactionAsync(cancellationToken);
-                    
-                        try
+                    foreach (var data in queryPatterns)
+                    {
+                        cmd.CommandText = data.Query;
+                        cmd.Parameters.Clear();
+
+                        if (data.Parameters != null && data.Parameters.Count > 0)
                         {
-                            await using (var cmd = _connection.CreateCommand())
+                            foreach (var parameterDict in data.Parameters)
                             {
-                                cmd.Transaction = transaction;
-                                cmd.CommandTimeout = commandTimeoutSeconds; 
-
-                                foreach (var data in queryPatterns)
+                                foreach (var param in parameterDict)
                                 {
-                                    cmd.CommandText = data.Query;
-                                    cmd.Parameters.Clear();
-
-                                    if (data.Parameters != null && data.Parameters.Count > 0)
-                                    {
-                                        foreach (var parameterDict in data.Parameters)
-                                        {
-                                            foreach (var param in parameterDict)
-                                            {
-                                                cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                                            }
-                                        }
-                                    }
-
-                                    await cmd.ExecuteNonQueryAsync(cancellationToken);
+                                    cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
                                 }
                             }
+                        }
 
-                            await transaction.CommitAsync(cancellationToken);
-                            return true;
-                        }
-                        catch
-                        {
-                            await transaction.RollbackAsync(cancellationToken);
-                            throw;
-                        }
-                    
-                
+                        await cmd.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                sw.Stop();
+                _logger?.LogInformation(
+                    "{Operation} executed {Count} statements in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChangesAsync),
+                    queryPatterns.Count,
+                    sw.ElapsedMilliseconds,
+                    queryPatterns.Select(q => DataQuery.TrimSqlForLog(q.Query)).ToList());
+                return true;
             }
-            catch
+            catch (Exception ex)
             {
+                sw.Stop();
+                try
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+                catch (Exception rollbackEx)
+                {
+                    _logger?.LogError(rollbackEx, "Failed to rollback transaction for {Operation}", nameof(SaveChangesAsync));
+                }
+
+                _logger?.LogError(
+                    ex,
+                    "{Operation} failed in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChangesAsync),
+                    sw.ElapsedMilliseconds,
+                    queryPatterns?.Select(q => DataQuery.TrimSqlForLog(q.Query)).ToList());
                 throw;
             }
         }
@@ -77,11 +97,10 @@ namespace AdoLite.SqlServer
 
         public async Task BulkInsertAsync(string tableName, DataTable dataTable)
         {
-            using (var bulkCopy = new SqlBulkCopy(_connection))
-            {
-                bulkCopy.DestinationTableName = tableName;
-                await bulkCopy.WriteToServerAsync(dataTable);
-            }
+            await using var connection = CreateAndOpenConnection();
+            using var bulkCopy = new SqlBulkCopy(connection);
+            bulkCopy.DestinationTableName = tableName;
+            await bulkCopy.WriteToServerAsync(dataTable);
         }
 
         public async Task BulkInsertFromCsvAsync(string tableName, string csvFilePath)

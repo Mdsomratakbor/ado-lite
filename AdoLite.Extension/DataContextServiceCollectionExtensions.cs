@@ -6,6 +6,10 @@ using AdoLite.Core.Services;
 using AdoLite.SqlServer;
 using AdoLite.MySql;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Configuration;
+using Microsoft.Extensions.Configuration;
+using AdoLite.Core.Base;
+using Microsoft.Extensions.Logging;
 
 
 namespace AdoLite.Extension
@@ -32,15 +36,18 @@ namespace AdoLite.Extension
             {
                 DatabaseProvider.PostgreSQL => provider => new PostgresDataContext(
                     connectionString,
-                    provider.GetRequiredService<IDataJSONServices>()
+                    provider.GetRequiredService<IDataJSONServices>(),
+                    provider.GetService<ILogger<AdoLite.Postgres.DataQuery>>()
                 ),
                 DatabaseProvider.SqlServer => provider => new MsSqlDataContext(
                    connectionString,
-                   provider.GetRequiredService<IDataJSONServices>()
+                   provider.GetRequiredService<IDataJSONServices>(),
+                   provider.GetService<ILogger<AdoLite.SqlServer.DataQuery>>()
                ),
                 DatabaseProvider.MySQL => provider => new MySqlDataContext(
                  connectionString,
-                 provider.GetRequiredService<IDataJSONServices>()
+                 provider.GetRequiredService<IDataJSONServices>(),
+                 provider.GetService<ILogger<AdoLite.MySql.DataQuery>>()
              ),
                 _ => throw new NotSupportedException($"Database provider '{providerType}' is not supported.")
             };
@@ -59,5 +66,31 @@ namespace AdoLite.Extension
 
         public static IServiceCollection UseMySQL(this IServiceCollection services, string connectionString, ServiceLifetime lifetime = ServiceLifetime.Scoped)
             => services.AddAdoLiteDataContext(DatabaseProvider.MySQL, connectionString, lifetime);
+
+
+        public static IServiceCollection AddAdoLiteDataContexts(
+                this IServiceCollection services,
+                DatabaseSettings databaseSettings,
+                ServiceLifetime lifetime = ServiceLifetime.Scoped)
+        {
+            if (databaseSettings == null) throw new ArgumentNullException(nameof(databaseSettings));
+
+            // Register the passed DatabaseSettings instance as singleton
+            services.AddSingleton(databaseSettings);
+
+            // Register JSON services
+            services.TryAdd(new ServiceDescriptor(typeof(IDataJSONServices), typeof(DataJSONServices), lifetime));
+
+            // Register the factory with injected DatabaseSettings and IDataJSONServices
+            services.AddSingleton<IDataContextFactory>(provider =>
+            {
+                var settings = provider.GetRequiredService<DatabaseSettings>();
+                var jsonServices = provider.GetRequiredService<IDataJSONServices>();
+                return new DataContextFactory(settings, jsonServices);
+            });
+
+            return services;
+        }
+
     }
 }

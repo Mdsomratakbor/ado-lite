@@ -1,86 +1,156 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using MySql.Data.MySqlClient;
-using AdoLite.Core.Interfaces;
+using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
+using AdoLite.Core.Interfaces;
+using Microsoft.Extensions.Logging;
+using MySql.Data.MySqlClient;
 
 namespace AdoLite.MySql
 {
     public partial class DataQuery : IDataQuery, IDisposable
     {
-        private readonly string _databaseConnection;
-        private readonly MySqlConnection _connection;
+        private readonly string _connectionString;
+        private readonly ILogger<DataQuery>? _logger;
         private bool _disposed;
 
-        public DataQuery(string connectionString)
+        public DataQuery(string connectionString, ILogger<DataQuery>? logger = null)
         {
-            _databaseConnection = connectionString;
-            _connection = new MySqlConnection(_databaseConnection);
-            _connection.Open();
+            _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+            _logger = logger;
         }
 
         public virtual DataRow GetDataRow(string query, Dictionary<string, string> parameter = null)
         {
-            using var dataAdapter = new MySqlDataAdapter(query, _connection);
+            using var connection = CreateAndOpenConnection();
+            using var dataAdapter = new MySqlDataAdapter(query, connection);
             AddParameters(dataAdapter.SelectCommand, parameter);
 
-            DataTable dataTable = new DataTable();
-            dataAdapter.Fill(dataTable);
-            return dataTable.Rows.Count > 0 ? dataTable.Rows[0] : null;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                DataTable dataTable = new DataTable();
+                dataAdapter.Fill(dataTable);
+                sw.Stop();
+                LogSuccess(nameof(GetDataRow), query, parameter, sw.ElapsedMilliseconds, dataTable.Rows.Count);
+                return dataTable.Rows.Count > 0 ? dataTable.Rows[0] : null;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetDataRow), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public virtual T GetSingleRecord<T>(string query, Dictionary<string, string> parameter = null) where T : new()
         {
-            using var dataAdapter = new MySqlDataAdapter(query, _connection);
+            using var connection = CreateAndOpenConnection();
+            using var dataAdapter = new MySqlDataAdapter(query, connection);
             AddParameters(dataAdapter.SelectCommand, parameter);
 
-            DataTable dataTable = new DataTable();
-            dataAdapter.Fill(dataTable);
-            if (dataTable.Rows.Count == 0) return default;
-
-            DataRow row = dataTable.Rows[0];
-            T result = new T();
-
-            foreach (DataColumn column in dataTable.Columns)
+            var sw = Stopwatch.StartNew();
+            try
             {
-                PropertyInfo prop = typeof(T).GetProperty(column.ColumnName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                if (prop != null && row[column] != DBNull.Value)
-                    prop.SetValue(result, Convert.ChangeType(row[column], prop.PropertyType));
-            }
+                DataTable dataTable = new DataTable();
+                dataAdapter.Fill(dataTable);
+                if (dataTable.Rows.Count == 0)
+                {
+                    sw.Stop();
+                    LogSuccess(nameof(GetSingleRecord), query, parameter, sw.ElapsedMilliseconds, 0);
+                    return default;
+                }
 
-            return result;
+                DataRow row = dataTable.Rows[0];
+                T result = new T();
+
+                foreach (DataColumn column in dataTable.Columns)
+                {
+                    PropertyInfo prop = typeof(T).GetProperty(column.ColumnName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                    if (prop != null && row[column] != DBNull.Value)
+                        prop.SetValue(result, Convert.ChangeType(row[column], prop.PropertyType));
+                }
+
+                sw.Stop();
+                LogSuccess(nameof(GetSingleRecord), query, parameter, sw.ElapsedMilliseconds, 1);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetSingleRecord), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public virtual DataSet GetDataSet(string query, Dictionary<string, string> parameter)
         {
-            using var dataAdapter = new MySqlDataAdapter(query, _connection);
+            using var connection = CreateAndOpenConnection();
+            using var dataAdapter = new MySqlDataAdapter(query, connection);
             AddParameters(dataAdapter.SelectCommand, parameter);
 
-            DataSet dataSet = new DataSet();
-            dataAdapter.Fill(dataSet);
-            return dataSet;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                DataSet dataSet = new DataSet();
+                dataAdapter.Fill(dataSet);
+                sw.Stop();
+                LogSuccess(nameof(GetDataSet), query, parameter, sw.ElapsedMilliseconds, dataSet.Tables.Count);
+                return dataSet;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetDataSet), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public virtual DataTable GetDataTable(string query, Dictionary<string, string> parameter = null)
         {
-            using var dataAdapter = new MySqlDataAdapter(query, _connection);
+            using var connection = CreateAndOpenConnection();
+            using var dataAdapter = new MySqlDataAdapter(query, connection);
             AddParameters(dataAdapter.SelectCommand, parameter);
 
-            DataTable dataTable = new DataTable();
-            dataAdapter.Fill(dataTable);
-            return dataTable;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                DataTable dataTable = new DataTable();
+                dataAdapter.Fill(dataTable);
+                sw.Stop();
+                LogSuccess(nameof(GetDataTable), query, parameter, sw.ElapsedMilliseconds, dataTable.Rows.Count);
+                return dataTable;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetDataTable), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public virtual T GetSingleValue<T>(string query, Dictionary<string, string> parameter = null)
         {
-            using var command = new MySqlCommand(query, _connection);
+            using var connection = CreateAndOpenConnection();
+            using var command = new MySqlCommand(query, connection);
             AddParameters(command, parameter);
 
-            object result = command.ExecuteScalar();
-            return (result != null && result != DBNull.Value)
-                ? (T)Convert.ChangeType(result, typeof(T))
-                : default;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                object result = command.ExecuteScalar();
+                sw.Stop();
+                LogSuccess(nameof(GetSingleValue), query, parameter, sw.ElapsedMilliseconds, result == null || result == DBNull.Value ? 0 : 1);
+                return ConvertResult<T>(result);
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetSingleValue), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public List<T> GetList<T>(string query, Dictionary<string, string> parameters = null)
@@ -102,11 +172,24 @@ namespace AdoLite.MySql
 
         public bool Exists(string query, Dictionary<string, string> parameters = null)
         {
-            using var command = new MySqlCommand(query, _connection);
+            using var connection = CreateAndOpenConnection();
+            using var command = new MySqlCommand(query, connection);
             AddParameters(command, parameters);
 
-            using var reader = command.ExecuteReader();
-            return reader.HasRows;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                using var reader = command.ExecuteReader();
+                sw.Stop();
+                LogSuccess(nameof(Exists), query, parameters, sw.ElapsedMilliseconds, reader.HasRows ? 1 : 0);
+                return reader.HasRows;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(Exists), query, parameters, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public DataTable GetPagedDataTable(string query, Dictionary<string, string> parameters, int pageNumber, int pageSize)
@@ -121,14 +204,27 @@ namespace AdoLite.MySql
             paramObj["@PageSize"] = pageSize;
             paramObj["@Offset"] = offset;
 
-            using var command = new MySqlCommand(pagedQuery, _connection);
+            using var connection = CreateAndOpenConnection();
+            using var command = new MySqlCommand(pagedQuery, connection);
             foreach (var param in paramObj)
-                command.Parameters.AddWithValue(param.Key, param.Value);
+                command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
 
             using var adapter = new MySqlDataAdapter(command);
-            var dataTable = new DataTable();
-            adapter.Fill(dataTable);
-            return dataTable;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                var dataTable = new DataTable();
+                adapter.Fill(dataTable);
+                sw.Stop();
+                LogSuccess(nameof(GetPagedDataTable), pagedQuery, parameters, sw.ElapsedMilliseconds, dataTable.Rows.Count);
+                return dataTable;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetPagedDataTable), pagedQuery, parameters, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public Dictionary<TKey, TValue> GetDictionary<TKey, TValue>(string query, Dictionary<string, string> parameters = null)
@@ -159,21 +255,66 @@ namespace AdoLite.MySql
             return list;
         }
 
-        private void AddParameters(MySqlCommand command, Dictionary<string, string> parameters)
+        private static void AddParameters(MySqlCommand command, Dictionary<string, string> parameters)
         {
-            if (parameters != null)
-            {
-                foreach (var param in parameters)
-                    command.Parameters.AddWithValue(param.Key, param.Value);
-            }
+            if (parameters == null) return;
+            foreach (var param in parameters)
+                command.Parameters.AddWithValue(param.Key, param.Value ?? (object)DBNull.Value);
+        }
+
+        private MySqlConnection CreateAndOpenConnection()
+        {
+            var connection = new MySqlConnection(_connectionString);
+            connection.Open();
+            return connection;
+        }
+
+        internal static string TrimSqlForLog(string sql, int maxLength = 500)
+        {
+            if (string.IsNullOrWhiteSpace(sql)) return string.Empty;
+            if (sql.Length <= maxLength) return sql;
+            return sql.Substring(0, maxLength) + "...";
+        }
+
+        internal static IReadOnlyDictionary<string, object> ToLoggableParameters(Dictionary<string, string> parameters)
+        {
+            if (parameters == null || parameters.Count == 0) return new Dictionary<string, object>();
+            return parameters.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value ?? "null");
+        }
+
+        private static T ConvertResult<T>(object result)
+        {
+            return (result != null && result != DBNull.Value)
+                ? (T)Convert.ChangeType(result, typeof(T))
+                : default;
+        }
+
+        private void LogSuccess(string operation, string query, Dictionary<string, string> parameters, long elapsedMs, int affectedRows)
+        {
+            _logger?.LogInformation(
+                "{Operation} executed in {ElapsedMs}ms | Rows={Rows} | Sql={Sql} | Params={@Params}",
+                operation,
+                elapsedMs,
+                affectedRows,
+                TrimSqlForLog(query),
+                ToLoggableParameters(parameters));
+        }
+
+        private void LogFailure(string operation, string query, Dictionary<string, string> parameters, long elapsedMs, Exception ex)
+        {
+            _logger?.LogError(
+                ex,
+                "{Operation} failed in {ElapsedMs}ms | Sql={Sql} | Params={@Params}",
+                operation,
+                elapsedMs,
+                TrimSqlForLog(query),
+                ToLoggableParameters(parameters));
         }
 
         public void Dispose()
         {
             if (!_disposed)
             {
-                _connection?.Close();
-                _connection?.Dispose();
                 _disposed = true;
             }
             GC.SuppressFinalize(this);

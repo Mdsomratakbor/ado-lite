@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using AdoLite.Core.Interfaces;
 using Microsoft.Data.SqlClient;  // Preferred over System.Data.SqlClient for .NET Core/8+
@@ -14,35 +16,28 @@ namespace AdoLite.SqlServer
         /// </summary>
         public virtual async Task<DataRow> GetDataRowAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
+            using var connection = CreateAndOpenConnection();
+            using var command = new SqlCommand(query, connection);
+            AddParameters(command, parameter);
+
+            var sw = Stopwatch.StartNew();
             try
             {
-               
-                    using (SqlCommand command = new SqlCommand(query, _connection))
-                    {
-                        if (parameter != null)
-                        {
-                            foreach (var item in parameter)
-                            {
-                                command.Parameters.AddWithValue(item.Key, item.Value);
-                            }
-                        }
+                using SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+                DataTable dt = new DataTable();
+                dt.Load(reader);
+                sw.Stop();
+                LogSuccess(nameof(GetDataRowAsync), query, parameter, sw.ElapsedMilliseconds, dt.Rows.Count);
 
+                if (dt.Rows.Count > 0)
+                    return dt.Rows[0];
 
-                        using (SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
-                        {
-                            DataTable dt = new DataTable();
-                            dt.Load(reader);
-
-                            if (dt.Rows.Count > 0)
-                                return dt.Rows[0];
-
-                            return null;
-                        }
-                    }
-                
+                return null;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                sw.Stop();
+                LogFailure(nameof(GetDataRowAsync), query, parameter, sw.ElapsedMilliseconds, ex);
                 throw;
             }
         }
@@ -52,35 +47,30 @@ namespace AdoLite.SqlServer
         /// </summary>
         public virtual async Task<DataSet> GetDataSetAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
+            using var connection = CreateAndOpenConnection();
+            using var command = new SqlCommand(query, connection);
+            AddParameters(command, parameter);
+
+            var sw = Stopwatch.StartNew();
             try
             {
-                using (var command = new SqlCommand(query, _connection))
-                {
-                    if (parameter != null)
-                    {
-                        foreach (var item in parameter)
-                        {
-                            command.Parameters.AddWithValue(item.Key, item.Value);
-                        }
-                    }
-
-                    using (var reader = await command.ExecuteReaderAsync(cancellationToken))
-                    {
-                        var ds = new DataSet();
-                        var dt = new DataTable();
-                        dt.Load(reader);  // Load synchronously from reader (fast in-memory)
-                        ds.Tables.Add(dt);
-                        return ds;
-                    }
-                }
+                using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                var ds = new DataSet();
+                var dt = new DataTable();
+                dt.Load(reader);  // Load synchronously from reader (fast in-memory)
+                ds.Tables.Add(dt);
+                sw.Stop();
+                LogSuccess(nameof(GetDataSetAsync), query, parameter, sw.ElapsedMilliseconds, ds.Tables.Count);
+                return ds;
             }
             catch (OperationCanceledException)
             {
-                // Handle cancellation specifically if needed
                 throw;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                sw.Stop();
+                LogFailure(nameof(GetDataSetAsync), query, parameter, sw.ElapsedMilliseconds, ex);
                 throw;
             }
         }
@@ -91,33 +81,28 @@ namespace AdoLite.SqlServer
         /// </summary>
         public virtual async Task<DataTable> GetDataTableAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
+            using var connection = CreateAndOpenConnection();
+            using var command = new SqlCommand(query, connection);
+            AddParameters(command, parameter);
+
+            var sw = Stopwatch.StartNew();
             try
             {
-                using (var command = new SqlCommand(query, _connection))
-                {
-                    if (parameter != null)
-                    {
-                        foreach (var item in parameter)
-                        {
-                            command.Parameters.AddWithValue(item.Key, item.Value);
-                        }
-                    }
-
-                    using (var reader = await command.ExecuteReaderAsync(cancellationToken))
-                    {
-                        var dt = new DataTable();
-                        dt.Load(reader); // Load synchronously but fast, after async read
-                        return dt;
-                    }
-                }
+                using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                var dt = new DataTable();
+                dt.Load(reader); // Load synchronously but fast, after async read
+                sw.Stop();
+                LogSuccess(nameof(GetDataTableAsync), query, parameter, sw.ElapsedMilliseconds, dt.Rows.Count);
+                return dt;
             }
             catch (OperationCanceledException)
             {
-                // Handle cancellation if needed (e.g., log, cleanup)
                 throw;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                sw.Stop();
+                LogFailure(nameof(GetDataTableAsync), query, parameter, sw.ElapsedMilliseconds, ex);
                 throw;
             }
         }
@@ -128,28 +113,22 @@ namespace AdoLite.SqlServer
         /// </summary>
         public virtual async Task<T> GetSingleValueAsync<T>(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
+            using var connection = CreateAndOpenConnection();
+            using var command = new SqlCommand(query, connection);
+            AddParameters(command, parameter);
+
+            var sw = Stopwatch.StartNew();
             try
             {
-                using (SqlCommand command = new SqlCommand(query, _connection))
-                {
-                    if (parameter != null)
-                    {
-                        foreach (var item in parameter)
-                        {
-                            command.Parameters.AddWithValue(item.Key, item.Value);
-                        }
-                    }
-
-                    object result = await command.ExecuteScalarAsync(cancellationToken);
-
-                    if (result != null && result != DBNull.Value)
-                        return (T)Convert.ChangeType(result, typeof(T));
-                    else
-                        return default;
-                }
+                object result = await command.ExecuteScalarAsync(cancellationToken);
+                sw.Stop();
+                LogSuccess(nameof(GetSingleValueAsync), query, parameter, sw.ElapsedMilliseconds, result == null || result == DBNull.Value ? 0 : 1);
+                return ConvertResult<T>(result);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                sw.Stop();
+                LogFailure(nameof(GetSingleValueAsync), query, parameter, sw.ElapsedMilliseconds, ex);
                 throw;
             }
         }

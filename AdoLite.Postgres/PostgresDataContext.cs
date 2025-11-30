@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AdoLite.Core.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace AdoLite.Postgres
 {
@@ -14,8 +15,9 @@ namespace AdoLite.Postgres
 
             public PostgresDataContext(
                 string connectionString,
-                IDataJSONServices jsonServices
-                ) : base(connectionString)
+                IDataJSONServices jsonServices,
+                ILogger<DataQuery>? logger = null
+                ) : base(connectionString, logger)
             {
                 JsonServices = jsonServices ?? throw new ArgumentNullException(nameof(jsonServices));
             }

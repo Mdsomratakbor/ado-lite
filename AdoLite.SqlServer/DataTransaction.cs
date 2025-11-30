@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using Microsoft.Data.SqlClient;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using AdoLite.Core.Base;
 using AdoLite.Core.Interfaces;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace AdoLite.SqlServer
@@ -42,67 +46,70 @@ namespace AdoLite.SqlServer
         /// <returns>A boolean indicating whether the operation was successful.</returns>
         public bool SaveChanges(List<IQueryPattern> queryPatterns)
         {
+            if (queryPatterns == null) throw new ArgumentNullException(nameof(queryPatterns));
+            using var connection = CreateAndOpenConnection();
+            using SqlTransaction transaction = connection.BeginTransaction();
+            var sw = Stopwatch.StartNew();
             try
             {
-        
-                    using (SqlTransaction transaction = _connection.BeginTransaction())
+                using SqlCommand cmd = connection.CreateCommand();
+                cmd.Transaction = transaction;
+
+                foreach (var data in queryPatterns)
+                {
+                    cmd.CommandText = data.Query;
+                    cmd.Parameters.Clear();
+
+                    if (data.Parameters != null && data.Parameters.Count > 0)
                     {
-                        try
+                        foreach (var parameterDict in data.Parameters)
                         {
-                            using (SqlCommand cmd = _connection.CreateCommand())
+                            foreach (var param in parameterDict)
                             {
-                                cmd.Transaction = transaction;
+                                object value = param.Value;
 
-                                foreach (var data in queryPatterns)
+                                if (value is SqlParameter sqlParam)
                                 {
-                                    cmd.CommandText = data.Query;
-                                    cmd.Parameters.Clear();
-
-                                    if (data.Parameters != null && data.Parameters.Count > 0)
-                                    {
-                                    //foreach (var parameterDict in data.Parameters)
-                                    //{
-                                    //    foreach (var param in parameterDict)
-                                    //    {
-                                    //        cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                                    //    }
-                                    //}
-
-                                    foreach (var parameterDict in data.Parameters)
-                                    {
-                                        foreach (var param in parameterDict)
-                                        {
-                                            object value = param.Value;
-
-                                            // If the value itself is a SqlParameter, unwrap its actual value
-                                            if (value is SqlParameter sqlParam)
-                                            {
-                                                value = sqlParam.Value ?? DBNull.Value;
-                                            }
-
-                                            cmd.Parameters.AddWithValue(param.Key, value ?? DBNull.Value);
-                                        }
-                                    }
-
-
+                                    value = sqlParam.Value ?? DBNull.Value;
                                 }
 
-                                    cmd.ExecuteNonQuery();
-                                }
+                                cmd.Parameters.AddWithValue(param.Key, value ?? DBNull.Value);
                             }
-                            transaction.Commit();
-                            return true;
-                        }
-                        catch (Exception)
-                        {
-                            transaction.Rollback();
-                            throw;
                         }
                     }
-                
+
+                    cmd.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                sw.Stop();
+                _logger?.LogInformation(
+                    "{Operation} executed {Count} statements in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChanges),
+                    queryPatterns.Count,
+                    sw.ElapsedMilliseconds,
+                    queryPatterns.Select(q => TrimSqlForLog(q.Query)).ToList());
+
+                return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                sw.Stop();
+                try
+                {
+                    transaction.Rollback();
+                }
+                catch (Exception rollbackEx)
+                {
+                    _logger?.LogError(rollbackEx, "Failed to rollback transaction for {Operation}", nameof(SaveChanges));
+                }
+
+                _logger?.LogError(
+                    ex,
+                    "{Operation} failed in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChanges),
+                    sw.ElapsedMilliseconds,
+                    queryPatterns?.Select(q => TrimSqlForLog(q.Query)).ToList());
                 throw;
             }
         }
@@ -110,21 +117,31 @@ namespace AdoLite.SqlServer
 
         public void ExecuteRawSql(string query)
         {
-            using (SqlCommand cmd = _connection.CreateCommand())
+            using var connection = CreateAndOpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = query;
+            var sw = Stopwatch.StartNew();
+            try
             {
-                cmd.CommandText = query;
                 cmd.ExecuteNonQuery();
+                sw.Stop();
+                LogSuccess(nameof(ExecuteRawSql), query, null, sw.ElapsedMilliseconds, 0);
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(ExecuteRawSql), query, null, sw.ElapsedMilliseconds, ex);
+                throw;
             }
         }
 
 
         public void BulkInsert(string tableName, DataTable dataTable)
         {
-            using (var bulkCopy = new SqlBulkCopy(_connection))
-            {
-                bulkCopy.DestinationTableName = tableName;
-                bulkCopy.WriteToServer(dataTable);
-            }
+            using var connection = CreateAndOpenConnection();
+            using var bulkCopy = new SqlBulkCopy(connection);
+            bulkCopy.DestinationTableName = tableName;
+            bulkCopy.WriteToServer(dataTable);
         }
 
     

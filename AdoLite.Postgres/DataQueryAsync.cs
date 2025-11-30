@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using AdoLite.Core.Interfaces;
@@ -28,24 +29,32 @@ namespace AdoLite.Postgres
         public virtual async Task<DataSet> GetDataSetAsync(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
         {
             var dataSet = new DataSet();
-            using var cmd = new NpgsqlCommand(query, _connection);
+            using var connection = CreateAndOpenConnection();
+            using var cmd = new NpgsqlCommand(query, connection);
+            AddParameters(cmd, parameters);
 
-            if (parameters != null)
+            var sw = Stopwatch.StartNew();
+            try
             {
-                foreach (var p in parameters)
-                    cmd.Parameters.AddWithValue(p.Key, p.Value);
+                using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
+                do
+                {
+                    var dt = new DataTable();
+                    dt.Load(reader);
+                    dataSet.Tables.Add(dt);
+                } while (!reader.IsClosed && await reader.NextResultAsync(cancellationToken));
+
+                sw.Stop();
+                LogSuccess(nameof(GetDataSetAsync), query, parameters, sw.ElapsedMilliseconds, dataSet.Tables.Count);
+                return dataSet;
             }
-
-            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-
-            do
+            catch (Exception ex)
             {
-                var dt = new DataTable();
-                dt.Load(reader);
-                dataSet.Tables.Add(dt);
-            } while (!reader.IsClosed && await reader.NextResultAsync(cancellationToken));
-
-            return dataSet;
+                sw.Stop();
+                LogFailure(nameof(GetDataSetAsync), query, parameters, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
 
@@ -54,32 +63,28 @@ namespace AdoLite.Postgres
         /// </summary>
         public virtual async Task<DataTable> GetDataTableAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
+            using var connection = CreateAndOpenConnection();
+            using var cmd = new NpgsqlCommand(query, connection);
+            AddParameters(cmd, parameter);
+
+            var sw = Stopwatch.StartNew();
             try
             {
-                using (var cmd = new NpgsqlCommand(query, _connection))
-                {
-                    if (parameter != null && parameter.Count > 0)
-                    {
-                        foreach (var item in parameter)
-                        {
-                            cmd.Parameters.AddWithValue(item.Key, item.Value);
-                        }
-                    }
-
-                    using (var reader = await cmd.ExecuteReaderAsync(cancellationToken))
-                    {
-                        var dt = new DataTable();
-                        dt.Load(reader);
-                        return dt;
-                    }
-                }
+                using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                var dt = new DataTable();
+                dt.Load(reader);
+                sw.Stop();
+                LogSuccess(nameof(GetDataTableAsync), query, parameter, sw.ElapsedMilliseconds, dt.Rows.Count);
+                return dt;
             }
             catch (OperationCanceledException)
             {
                 throw; // Propagate cancellation
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                sw.Stop();
+                LogFailure(nameof(GetDataTableAsync), query, parameter, sw.ElapsedMilliseconds, ex);
                 throw;
             }
         }
@@ -89,35 +94,26 @@ namespace AdoLite.Postgres
         /// </summary>
         public virtual async Task<T> GetSingleValueAsync<T>(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
+            using var connection = CreateAndOpenConnection();
+            using var cmd = new NpgsqlCommand(query, connection);
+            AddParameters(cmd, parameter);
+
+            var sw = Stopwatch.StartNew();
             try
             {
-                using (var cmd = new NpgsqlCommand(query, _connection))
-                {
-                    if (parameter != null && parameter.Count > 0)
-                    {
-                        foreach (var item in parameter)
-                        {
-                            cmd.Parameters.AddWithValue(item.Key, item.Value);
-                        }
-                    }
-
-                    using (var reader = await cmd.ExecuteReaderAsync(cancellationToken))
-                    {
-                        if (await reader.ReadAsync(cancellationToken))
-                        {
-                            var data = reader.IsDBNull(0) ? default(T) : (T)Convert.ChangeType(reader[0], typeof(T));
-                            return data;
-                        }
-                    }
-                }
-                return default;
+                object result = await cmd.ExecuteScalarAsync(cancellationToken);
+                sw.Stop();
+                LogSuccess(nameof(GetSingleValueAsync), query, parameter, sw.ElapsedMilliseconds, result == null || result == DBNull.Value ? 0 : 1);
+                return ConvertResult<T>(result);
             }
             catch (OperationCanceledException)
             {
                 throw;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                sw.Stop();
+                LogFailure(nameof(GetSingleValueAsync), query, parameter, sw.ElapsedMilliseconds, ex);
                 throw;
             }
         }

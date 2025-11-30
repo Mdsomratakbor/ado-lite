@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using AdoLite.Core.Interfaces;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace AdoLite.Postgres
@@ -44,53 +47,71 @@ namespace AdoLite.Postgres
         /// <returns>True if all queries were successfully executed and committed.</returns>
         public async Task<bool> SaveChangesAsync(List<IQueryPattern> queryPatterns, int commandTimeoutSeconds = 30, CancellationToken cancellationToken = default)
         {
+            if (queryPatterns == null) throw new ArgumentNullException(nameof(queryPatterns));
+
+            await using var connection = CreateAndOpenConnection();
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);  // Begin a transaction
+            var sw = Stopwatch.StartNew();
             try
             {
-               
-                    var transaction = await _connection.BeginTransactionAsync(cancellationToken);  // Begin a transaction
+                await using (NpgsqlCommand cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;  // Assign the transaction to the command
 
-                    try
+                    // Loop through each query pattern and execute it
+                    foreach (var data in queryPatterns)
                     {
-                        using (NpgsqlCommand cmd = _connection.CreateCommand())
+                        cmd.CommandText = data.Query;  // Set the query text
+                        cmd.CommandTimeout = commandTimeoutSeconds;
+                        // Add parameters to the command if provided
+                        if (data.Parameters != null && data.Parameters.Count > 0)
                         {
-                            cmd.Transaction = transaction;  // Assign the transaction to the command
-
-                            // Loop through each query pattern and execute it
-                            foreach (var data in queryPatterns)
+                            cmd.Parameters.Clear();  // Clear any previous parameters
+                            foreach (var parameter in data.Parameters)
                             {
-                                cmd.CommandText = data.Query;  // Set the query text
-                                cmd.CommandTimeout = commandTimeoutSeconds;
-                                // Add parameters to the command if provided
-                                if (data.Parameters.Count > 0 && data.Parameters != null)
+                                foreach (var item in parameter)
                                 {
-                                    cmd.Parameters.Clear();  // Clear any previous parameters
-                                    foreach (var parameter in data.Parameters)
-                                    {
-                                        foreach (var item in parameter)
-                                        {
-                                            cmd.Parameters.AddWithValue(item.Key, item.Value);  // Add new parameters
-                                        }
-                                    }
+                                    cmd.Parameters.AddWithValue(item.Key, item.Value);  // Add new parameters
                                 }
-
-                                // Execute the query asynchronously
-                                await cmd.ExecuteNonQueryAsync(cancellationToken);
                             }
-
-                            await transaction.CommitAsync(cancellationToken);  // Commit the transaction if all queries were successful
                         }
+
+                        // Execute the query asynchronously
+                        await cmd.ExecuteNonQueryAsync(cancellationToken);
                     }
-                    catch (Exception)
-                    {
-                        await transaction.RollbackAsync(cancellationToken);  // Rollback the transaction if there was an error
-                        throw;
-                    }
-                
+
+                    await transaction.CommitAsync(cancellationToken);  // Commit the transaction if all queries were successful
+                }
+
+                sw.Stop();
+                _logger?.LogInformation(
+                    "{Operation} executed {Count} statements in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChangesAsync),
+                    queryPatterns.Count,
+                    sw.ElapsedMilliseconds,
+                    queryPatterns.Select(q => TrimSqlForLog(q.Query)).ToList());
 
                 return true;  // Return true if all queries were executed successfully
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                sw.Stop();
+                try
+                {
+                    await transaction.RollbackAsync(cancellationToken);  // Rollback the transaction if there was an error
+                }
+                catch (Exception rollbackEx)
+                {
+                    _logger?.LogError(rollbackEx, "Failed to rollback transaction for {Operation}", nameof(SaveChangesAsync));
+                }
+
+                _logger?.LogError(
+                    ex,
+                    "{Operation} failed in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChangesAsync),
+                    sw.ElapsedMilliseconds,
+                    queryPatterns?.Select(q => TrimSqlForLog(q.Query)).ToList());
+
                 throw;  // Rethrow the exception for handling at a higher level
             }
         }

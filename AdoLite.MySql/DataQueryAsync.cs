@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using AdoLite.Core.Interfaces;
 using MySql.Data.MySqlClient;
@@ -13,81 +15,106 @@ namespace AdoLite.MySql
 
         public virtual async Task<DataRow> GetDataRowAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
-            using var command = new MySqlCommand(query, _connection);
-            if (parameter != null)
-            {
-                foreach (var item in parameter)
-                {
-                    command.Parameters.AddWithValue(item.Key, item.Value);
-                }
-            }
+            using var connection = CreateAndOpenConnection();
+            using var command = new MySqlCommand(query, connection);
+            AddParameters(command, parameter);
 
-            using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var dt = new DataTable();
-            dt.Load(reader);
-            return dt.Rows.Count > 0 ? dt.Rows[0] : null;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                var dt = new DataTable();
+                dt.Load(reader);
+                sw.Stop();
+                LogSuccess(nameof(GetDataRowAsync), query, parameter, sw.ElapsedMilliseconds, dt.Rows.Count);
+                return dt.Rows.Count > 0 ? dt.Rows[0] : null;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetDataRowAsync), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public virtual async Task<DataSet> GetDataSetAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
             var dataSet = new DataSet();
+            using var connection = CreateAndOpenConnection();
+            using var command = new MySqlCommand(query, connection);
+            AddParameters(command, parameter);
 
-            using var command = new MySqlCommand(query, _connection);
-            if (parameter != null)
+            var sw = Stopwatch.StartNew();
+            try
             {
-                foreach (var item in parameter)
+                using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                int tableIndex = 0;
+                do
                 {
-                    command.Parameters.AddWithValue(item.Key, item.Value);
+                    var dt = new DataTable($"Table{tableIndex++}");
+                    dt.Load(reader);
+                    dataSet.Tables.Add(dt);
                 }
-            }
+                while (!reader.IsClosed && await reader.NextResultAsync(cancellationToken));
 
-            using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            int tableIndex = 0;
-            do
+                sw.Stop();
+                LogSuccess(nameof(GetDataSetAsync), query, parameter, sw.ElapsedMilliseconds, dataSet.Tables.Count);
+                return dataSet;
+            }
+            catch (Exception ex)
             {
-                var dt = new DataTable($"Table{tableIndex++}");
-                dt.Load(reader);
-                dataSet.Tables.Add(dt);
+                sw.Stop();
+                LogFailure(nameof(GetDataSetAsync), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
             }
-            while (!reader.IsClosed && await reader.NextResultAsync(cancellationToken));
-
-            return dataSet;
         }
 
         public virtual async Task<DataTable> GetDataTableAsync(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
             var dt = new DataTable();
+            using var connection = CreateAndOpenConnection();
+            using var command = new MySqlCommand(query, connection);
+            AddParameters(command, parameter);
 
-            using var command = new MySqlCommand(query, _connection);
-            if (parameter != null)
+            var sw = Stopwatch.StartNew();
+            try
             {
-                foreach (var item in parameter)
-                {
-                    command.Parameters.AddWithValue(item.Key, item.Value);
-                }
+                using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                dt.Load(reader);
+                sw.Stop();
+                LogSuccess(nameof(GetDataTableAsync), query, parameter, sw.ElapsedMilliseconds, dt.Rows.Count);
+                return dt;
             }
-
-            using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            dt.Load(reader);
-
-            return dt;
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetDataTableAsync), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public virtual async Task<T> GetSingleValueAsync<T>(string query, Dictionary<string, string> parameter = null, CancellationToken cancellationToken = default)
         {
-            using var command = new MySqlCommand(query, _connection);
-            if (parameter != null)
-            {
-                foreach (var item in parameter)
-                {
-                    command.Parameters.AddWithValue(item.Key, item.Value);
-                }
-            }
+            using var connection = CreateAndOpenConnection();
+            using var command = new MySqlCommand(query, connection);
+            AddParameters(command, parameter);
 
-            object result = await command.ExecuteScalarAsync(cancellationToken);
-            return (result != null && result != DBNull.Value)
-                ? (T)Convert.ChangeType(result, typeof(T))
-                : default;
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                object result = await command.ExecuteScalarAsync(cancellationToken);
+                sw.Stop();
+                LogSuccess(nameof(GetSingleValueAsync), query, parameter, sw.ElapsedMilliseconds, result == null || result == DBNull.Value ? 0 : 1);
+                return (result != null && result != DBNull.Value)
+                    ? (T)Convert.ChangeType(result, typeof(T))
+                    : default;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(GetSingleValueAsync), query, parameter, sw.ElapsedMilliseconds, ex);
+                throw;
+            }
         }
 
         public virtual async Task<T> GetSingleRecordAsync<T>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default) where T : new()

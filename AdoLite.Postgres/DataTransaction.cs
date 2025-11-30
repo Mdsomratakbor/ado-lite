@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AdoLite.Core.Base;
 using AdoLite.Core.Interfaces;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace AdoLite.Postgres
@@ -45,55 +48,84 @@ namespace AdoLite.Postgres
         /// <returns>A boolean indicating whether the operation was successful.</returns>
         public bool SaveChanges(List<IQueryPattern> queryPatterns)
         {
+            if (queryPatterns == null) throw new ArgumentNullException(nameof(queryPatterns));
+            using var connection = CreateAndOpenConnection();
+            using var transaction = connection.BeginTransaction(); // Begin transaction
+            var sw = Stopwatch.StartNew();
             try
             {
-                    NpgsqlTransaction transaction;
-                    transaction = _connection.BeginTransaction(); // Begin transaction
-                    try
+                using (NpgsqlCommand cmd = connection.CreateCommand()) // PostgreSQL command
+                {
+                    cmd.Transaction = transaction;
+                    foreach (var data in queryPatterns)
                     {
-                        using (NpgsqlCommand cmd = _connection.CreateCommand()) // PostgreSQL command
+                        cmd.CommandText = data.Query;
+                        if (data.Parameters != null && data.Parameters.Count > 0)
                         {
-                            cmd.Transaction = transaction;
-                            foreach (var data in queryPatterns)
+                            cmd.Parameters.Clear();
+                            foreach (var parameter in data.Parameters)
                             {
-                                cmd.CommandText = data.Query;
-                                if (data.Parameters.Count > 0 && data.Parameters != null)
+                                foreach (var item in parameter)
                                 {
-                                    cmd.Parameters.Clear();
-                                    foreach (var parameter in data.Parameters)
-                                    {
-                                        foreach (var item in parameter)
-                                        {
-                                            cmd.Parameters.AddWithValue(item.Key, item.Value); // Add parameters to the command
-                                        }
-                                    }
+                                    cmd.Parameters.AddWithValue(item.Key, item.Value); // Add parameters to the command
                                 }
-
-                                cmd.ExecuteNonQuery();
                             }
-                            transaction.Commit(); // Commit the transaction
                         }
+
+                        cmd.ExecuteNonQuery();
                     }
-                    catch (Exception ex1)
-                    {
-                        transaction.Rollback(); // Rollback in case of an error
-                        throw ex1;
-                    }
-                
+                    transaction.Commit(); // Commit the transaction
+                }
+
+                sw.Stop();
+                _logger?.LogInformation(
+                    "{Operation} executed {Count} statements in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChanges),
+                    queryPatterns.Count,
+                    sw.ElapsedMilliseconds,
+                    queryPatterns.Select(q => TrimSqlForLog(q.Query)).ToList());
+
                 return true;
             }
             catch (Exception ex)
             {
-                throw ex;
+                sw.Stop();
+                try
+                {
+                    transaction.Rollback(); // Rollback in case of an error
+                }
+                catch (Exception rollbackEx)
+                {
+                    _logger?.LogError(rollbackEx, "Failed to rollback transaction for {Operation}", nameof(SaveChanges));
+                }
+
+                _logger?.LogError(
+                    ex,
+                    "{Operation} failed in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChanges),
+                    sw.ElapsedMilliseconds,
+                    queryPatterns?.Select(q => TrimSqlForLog(q.Query)).ToList());
+                throw;
             }
         }
 
         public void ExecuteRawSql(string query)
         {
-            using (NpgsqlCommand cmd = _connection.CreateCommand())
+            using var connection = CreateAndOpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = query;
+            var sw = Stopwatch.StartNew();
+            try
             {
-                cmd.CommandText = query;
                 cmd.ExecuteNonQuery();
+                sw.Stop();
+                LogSuccess(nameof(ExecuteRawSql), query, null, sw.ElapsedMilliseconds, 0);
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                LogFailure(nameof(ExecuteRawSql), query, null, sw.ElapsedMilliseconds, ex);
+                throw;
             }
         }
 

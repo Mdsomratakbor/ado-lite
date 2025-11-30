@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using MySql.Data.MySqlClient;
 using AdoLite.Core.Interfaces;
-using System.Data;
+using Microsoft.Extensions.Logging;
+using MySql.Data.MySqlClient;
 
 namespace AdoLite.MySql
 {
@@ -41,46 +44,63 @@ namespace AdoLite.MySql
             int commandTimeoutSeconds = 30,
             CancellationToken cancellationToken = default)
         {
+            if (queryPatterns == null) throw new ArgumentNullException(nameof(queryPatterns));
+            await using var connection = CreateAndOpenConnection();
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var sw = Stopwatch.StartNew();
             try
             {
-                await using var transaction = await _connection.BeginTransactionAsync(cancellationToken);
+                await using var cmd = connection.CreateCommand();
+                cmd.Transaction = transaction;
+                cmd.CommandTimeout = commandTimeoutSeconds;
 
-                try
+                foreach (var data in queryPatterns)
                 {
-                    await using var cmd = _connection.CreateCommand();
-                    cmd.Transaction = transaction;
-                    cmd.CommandTimeout = commandTimeoutSeconds;
+                    cmd.CommandText = data.Query;
+                    cmd.Parameters.Clear();
 
-                    foreach (var data in queryPatterns)
+                    if (data.Parameters != null && data.Parameters.Count > 0)
                     {
-                        cmd.CommandText = data.Query;
-                        cmd.Parameters.Clear();
-
-                        if (data.Parameters != null && data.Parameters.Count > 0)
+                        foreach (var parameterDict in data.Parameters)
                         {
-                            foreach (var parameterDict in data.Parameters)
+                            foreach (var param in parameterDict)
                             {
-                                foreach (var param in parameterDict)
-                                {
-                                    cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                                }
+                                cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
                             }
                         }
-
-                        await cmd.ExecuteNonQueryAsync(cancellationToken);
                     }
 
-                    await transaction.CommitAsync(cancellationToken);
-                    return true;
+                    await cmd.ExecuteNonQueryAsync(cancellationToken);
                 }
-                catch
+
+                await transaction.CommitAsync(cancellationToken);
+                sw.Stop();
+                _logger?.LogInformation(
+                    "{Operation} executed {Count} statements in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChangesAsync),
+                    queryPatterns.Count,
+                    sw.ElapsedMilliseconds,
+                    queryPatterns.Select(q => TrimSqlForLog(q.Query)).ToList());
+                return true;
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                try
                 {
                     await transaction.RollbackAsync(cancellationToken);
-                    throw;
                 }
-            }
-            catch
-            {
+                catch (Exception rollbackEx)
+                {
+                    _logger?.LogError(rollbackEx, "Failed to rollback transaction for {Operation}", nameof(SaveChangesAsync));
+                }
+
+                _logger?.LogError(
+                    ex,
+                    "{Operation} failed in {ElapsedMs}ms | SqlBatch={@Batch}",
+                    nameof(SaveChangesAsync),
+                    sw.ElapsedMilliseconds,
+                    queryPatterns?.Select(q => TrimSqlForLog(q.Query)).ToList());
                 throw;
             }
         }

@@ -14,7 +14,7 @@ public class DataQueryIntegrationTests : IDisposable
     private readonly DataQuery _dataQuery;
 
     // Provide your test DB connection string here
-    private const string TestConnectionString = "Server=.;Database=TestDb;User Id=sa;Password=007;TrustServerCertificate=True;";
+    private const string TestConnectionString = "Server=.;Database=TestDb;User Id=sa;Password=007;TrustServerCertificate=True;Pooling=true;Max Pool Size=50;";
 
 
 
