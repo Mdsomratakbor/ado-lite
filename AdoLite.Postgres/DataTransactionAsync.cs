@@ -16,28 +16,28 @@ namespace AdoLite.Postgres
     {
         public void BulkInsert<T>(string tableName, List<T> dataList)
         {
-            throw new NotImplementedException();
+            BulkInsertAsync(tableName, dataList).GetAwaiter().GetResult();
         }
 
         public Task BulkInsertAsync(string tableName, DataTable dataTable)
         {
-            throw new NotImplementedException();
+            return Task.Run(() => BulkInsert(tableName, dataTable));
         }
 
         public Task BulkInsertAsync<T>(string tableName, List<T> dataList)
         {
-            throw new NotImplementedException();
+            return Task.Run(() => BulkInsert(tableName, dataList));
         }
 
         public Task BulkInsertFromCsvAsync(string tableName, string csvFilePath)
         {
-            throw new NotImplementedException();
+            return Task.Run(() => BulkInsertFromCsv(tableName, csvFilePath));
         }
 
      
         public Task BulkInsertFromJsonAsync<T>(string tableName, string jsonFilePath)
         {
-            throw new NotImplementedException();
+            return Task.Run(() => BulkInsertFromJson<T>(tableName, jsonFilePath));
         }
 
         /// <summary>

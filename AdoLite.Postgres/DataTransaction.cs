@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using AdoLite.Core.Base;
 using AdoLite.Core.Interfaces;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Npgsql;
 
 namespace AdoLite.Postgres
@@ -145,17 +146,52 @@ namespace AdoLite.Postgres
 
         public void BulkInsert(string tableName, DataTable dataTable)
         {
-            throw new NotImplementedException();
+            if (string.IsNullOrWhiteSpace(tableName)) throw new ArgumentNullException(nameof(tableName));
+            if (dataTable == null || dataTable.Columns.Count == 0 || dataTable.Rows.Count == 0) return;
+
+            using var connection = CreateAndOpenConnection();
+            using var transaction = connection.BeginTransaction();
+            try
+            {
+                var columnNames = string.Join(", ", dataTable.Columns.Cast<DataColumn>().Select(c => c.ColumnName));
+                var paramNames = dataTable.Columns.Cast<DataColumn>().Select((c, i) => $"@p{i}");
+                var paramList = string.Join(", ", paramNames);
+                var insertSql = $"INSERT INTO {tableName} ({columnNames}) VALUES ({paramList});";
+
+                using var cmd = connection.CreateCommand();
+                cmd.Transaction = transaction;
+
+                foreach (DataRow row in dataTable.Rows)
+                {
+                    cmd.CommandText = insertSql;
+                    cmd.Parameters.Clear();
+                    for (int i = 0; i < dataTable.Columns.Count; i++)
+                    {
+                        cmd.Parameters.AddWithValue($"@p{i}", row[i] ?? DBNull.Value);
+                    }
+                    cmd.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
         public void BulkInsertFromJson<T>(string tableName, string jsonFilePath)
         {
-            throw new NotImplementedException();
+            var jsonData = File.ReadAllText(jsonFilePath);
+            var dataList = JsonConvert.DeserializeObject<List<T>>(jsonData) ?? new List<T>();
+            BulkInsert(tableName, ToDataTable(dataList));
         }
 
         public void BulkInsertFromCsv(string tableName, string csvFilePath)
         {
-            throw new NotImplementedException();
+            var table = CsvToDataTable(csvFilePath);
+            BulkInsert(tableName, table);
         }
 
         private DataTable ToDataTable<T>(List<T> data)
