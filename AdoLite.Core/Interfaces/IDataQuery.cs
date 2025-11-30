@@ -96,7 +96,7 @@ namespace AdoLite.Core.Interfaces
         /// <param name="query">The SQL query expected to return two columns (key and value).</param>
         /// <param name="parameters">Optional query parameters.</param>
         /// <returns>Dictionary of key-value pairs.</returns>
-        Dictionary<TKey, TValue> GetDictionary<TKey, TValue>(string query, Dictionary<string, string> parameters = null);
+        Dictionary<TKey, TValue> GetDictionary<TKey, TValue>(string query, Dictionary<string, string> parameters = null) where TKey : notnull;
 
         /// <summary>
         /// Gets a list of strongly typed objects from the query result using a mapper function.

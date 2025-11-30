@@ -14,12 +14,29 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using Xunit;
+using Xunit.Sdk;
 
 namespace AdoLite.Tests.Extensions
 {
     public class DataContextServiceCollectionExtensionsTests
     {
-        private const string TestConnectionString = "Server=.;Database=TestDb;User Id=sa;Password=007;TrustServerCertificate=True;";
+        private const string DefaultSqlServer = "Server=.;Database=TestDb;User Id=sa;Password=007;TrustServerCertificate=True;";
+        private const string DefaultPostgres = "Host=localhost;Database=postgres;Username=postgres;Password=postgres;";
+        private const string DefaultMySql = "Server=localhost;Database=mysql;Uid=root;Pwd=root;";
+
+        private static string GetConnectionOrSkip(string envVar, string providerName)
+        {
+            var value = Environment.GetEnvironmentVariable(envVar);
+            if (!string.IsNullOrWhiteSpace(value)) return value;
+
+            return providerName switch
+            {
+                "SQL Server" => DefaultSqlServer,
+                "PostgreSQL" => DefaultPostgres,
+                "MySQL" => DefaultMySql,
+                _ => value ?? string.Empty
+            };
+        }
 
         [Fact]
         public void ShouldThrowForUnsupportedProvider()
@@ -30,7 +47,7 @@ namespace AdoLite.Tests.Extensions
 
             // Act & Assert
             var exception = Assert.Throws<NotSupportedException>(() =>
-                services.AddAdoLiteDataContext(unsupportedProvider, TestConnectionString));
+                services.AddAdoLiteDataContext(unsupportedProvider, "dummy-connection"));
 
             Assert.Contains("not supported", exception.Message);
         }
@@ -39,10 +56,11 @@ namespace AdoLite.Tests.Extensions
         {
             // Arrange
             var services = new ServiceCollection();
+            var conn = GetConnectionOrSkip("ADOLITE_SQLSERVER_CONNECTION", "SQL Server");
 
             // Manually register context without required IDataJSONServices
             services.Add(new ServiceDescriptor(typeof(IDataContext), provider =>
-                new MsSqlDataContext(TestConnectionString, null!), ServiceLifetime.Scoped));
+                new MsSqlDataContext(conn, null!), ServiceLifetime.Scoped));
 
             var provider = services.BuildServiceProvider();
 
@@ -57,10 +75,11 @@ namespace AdoLite.Tests.Extensions
         {
             // Arrange
             var services = new ServiceCollection();
+            var conn = GetConnectionOrSkip("ADOLITE_SQLSERVER_CONNECTION", "SQL Server");
 
             // Register context via DI factory, but don't register IDataJSONServices
             services.Add(new ServiceDescriptor(typeof(IDataContext), provider =>
-                new MsSqlDataContext(TestConnectionString, provider.GetRequiredService<IDataJSONServices>()), ServiceLifetime.Scoped));
+                new MsSqlDataContext(conn, provider.GetRequiredService<IDataJSONServices>()), ServiceLifetime.Scoped));
 
             var provider = services.BuildServiceProvider();
 
@@ -93,7 +112,7 @@ namespace AdoLite.Tests.Extensions
 
            // var mockJsonService = new Mock<IDataJSONServices>();
            // services.AddSingleton(mockJsonService.Object);
-            services.AddAdoLiteDataContext(providerType, TestConnectionString);
+            services.AddAdoLiteDataContext(providerType, GetConnectionOrSkip("ADOLITE_SQLSERVER_CONNECTION", "SQL Server"));
             // Act
             var serviceProvider = services.BuildServiceProvider();
             var dataContext = serviceProvider.GetRequiredService<IDataContext>();
@@ -108,7 +127,7 @@ namespace AdoLite.Tests.Extensions
         {
             // Arrange
             var services = new ServiceCollection();
-            services.UseSqlServer(TestConnectionString);
+            services.UseSqlServer(GetConnectionOrSkip("ADOLITE_SQLSERVER_CONNECTION", "SQL Server"));
 
             // Act
             var serviceProvider = services.BuildServiceProvider();
@@ -124,7 +143,7 @@ namespace AdoLite.Tests.Extensions
         public void UsePostgreSQL_ShouldRegisterPostgresDataContext()
         {
             var services = new ServiceCollection();
-            services.UsePostgreSQL(TestConnectionString);
+            services.UsePostgreSQL(GetConnectionOrSkip("ADOLITE_POSTGRES_CONNECTION", "PostgreSQL"));
 
             var provider = services.BuildServiceProvider();
             var context = provider.GetRequiredService<IDataContext>();
@@ -136,7 +155,7 @@ namespace AdoLite.Tests.Extensions
         public void UseSqlServer_ShouldRegisterMsSqlDataContext()
         {
             var services = new ServiceCollection();
-            services.UseSqlServer(TestConnectionString);
+            services.UseSqlServer(GetConnectionOrSkip("ADOLITE_SQLSERVER_CONNECTION", "SQL Server"));
 
             var provider = services.BuildServiceProvider();
             var context = provider.GetRequiredService<IDataContext>();
@@ -148,7 +167,7 @@ namespace AdoLite.Tests.Extensions
         public void UseMySQL_ShouldRegisterMySqlDataContext()
         {
             var services = new ServiceCollection();
-            services.UseMySQL(TestConnectionString);
+            services.UseMySQL(GetConnectionOrSkip("ADOLITE_MYSQL_CONNECTION", "MySQL"));
 
             var provider = services.BuildServiceProvider();
             var context = provider.GetRequiredService<IDataContext>();

@@ -13,11 +13,18 @@ using Microsoft.Extensions.Logging;
 var services = new ServiceCollection();
 services.AddLogging(builder => builder.AddSimpleConsole());
 
+var sqlConnection = Environment.GetEnvironmentVariable("ADOLITE_SQLSERVER_CONNECTION");
+if (string.IsNullOrWhiteSpace(sqlConnection))
+{
+    Console.WriteLine("Set ADOLITE_SQLSERVER_CONNECTION to run the SQL Server sample.");
+    return;
+}
+
 var settings = new DatabaseSettings();
 settings.Connections["Default"] = new DatabaseConfig
 {
     Provider = DatabaseProvider.SqlServer,
-    ConnectionString = "Server=.;Database=TestDb;User Id=sa;Password=007;TrustServerCertificate=True;Pooling=true;Max Pool Size=50;"
+    ConnectionString = sqlConnection
 };
 
 services.AddAdoLiteDataContexts(settings);

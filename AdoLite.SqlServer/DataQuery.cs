@@ -227,7 +227,7 @@ namespace AdoLite.SqlServer
             }
         }
 
-        public Dictionary<TKey, TValue> GetDictionary<TKey, TValue>(string query, Dictionary<string, string> parameters = null)
+        public Dictionary<TKey, TValue> GetDictionary<TKey, TValue>(string query, Dictionary<string, string> parameters = null) where TKey : notnull
         {
             var dict = new Dictionary<TKey, TValue>();
             var dt = GetDataTable(query, parameters);

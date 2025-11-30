@@ -15,7 +15,7 @@ namespace AdoLite.Postgres
 {
     public partial class DataQuery : IDataTransaction
     {
-        public IQueryPattern _queryPattern;
+        public IQueryPattern? _queryPattern;
         public Dictionary<string, object> AddParameters(string[] values = null)
         {
             var parameters = new Dictionary<string, object>();

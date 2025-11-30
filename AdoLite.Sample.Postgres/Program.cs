@@ -13,11 +13,18 @@ using Microsoft.Extensions.Logging;
 var services = new ServiceCollection();
 services.AddLogging(builder => builder.AddSimpleConsole());
 
+var pgConnection = Environment.GetEnvironmentVariable("ADOLITE_POSTGRES_CONNECTION");
+if (string.IsNullOrWhiteSpace(pgConnection))
+{
+    Console.WriteLine("Set ADOLITE_POSTGRES_CONNECTION to run the PostgreSQL sample.");
+    return;
+}
+
 var settings = new DatabaseSettings();
 settings.Connections["Default"] = new DatabaseConfig
 {
     Provider = DatabaseProvider.PostgreSQL,
-    ConnectionString = "Host=localhost;Database=sampledb;Username=postgres;Password=yourpassword;Pooling=true;Maximum Pool Size=50;"
+    ConnectionString = pgConnection
 };
 
 services.AddAdoLiteDataContexts(settings);

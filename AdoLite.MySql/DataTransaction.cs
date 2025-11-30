@@ -13,7 +13,7 @@ namespace AdoLite.MySql
 {
     public partial class DataQuery : IDataTransaction
     {
-        public IQueryPattern _queryPattern;
+        public IQueryPattern? _queryPattern;
 
 
         public Dictionary<string, object> AddParameters(string[] values = null)

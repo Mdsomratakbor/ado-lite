@@ -204,7 +204,7 @@ namespace AdoLite.SqlServer
         /// <summary>
         /// Retrieves a dictionary asynchronously.
         /// </summary>
-        public virtual async Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default)
+        public virtual async Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default) where TKey : notnull
         {
             var dt = await GetDataTableAsync(query, parameters, cancellationToken);
             var dict = new Dictionary<TKey, TValue>();

@@ -103,7 +103,7 @@ namespace AdoLite.Core.Interfaces
         /// <param name="parameters">Optional query parameters.</param>
         /// <param name="cancellationToken">Optional token to cancel the operation.</param>
         /// <returns>A task that represents the asynchronous operation. The task result contains a dictionary of key-value pairs.</returns>
-        Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default);
+        Task<Dictionary<TKey, TValue>> GetDictionaryAsync<TKey, TValue>(string query, Dictionary<string, string> parameters = null, CancellationToken cancellationToken = default) where TKey : notnull;
 
         /// <summary>
         /// Executes a SQL query asynchronously and returns a list of objects using a mapping function.

@@ -7,14 +7,17 @@ using AdoLite.Tests.SqlServer.Models;
 using Microsoft.Data.SqlClient;
 using AdoLite.Core.Interfaces;
 using AdoLite.Core.Base;
+using Xunit.Sdk;
 
 namespace AdoLite.Tests.SqlServer;
 public class DataQueryIntegrationTests : IDisposable
 {
     private readonly DataQuery _dataQuery;
 
-    // Provide your test DB connection string here
-    private const string TestConnectionString = "Server=.;Database=TestDb;User Id=sa;Password=007;TrustServerCertificate=True;Pooling=true;Max Pool Size=50;";
+    private const string DefaultConnectionString = "Server=.;Database=TestDb;User Id=sa;Password=007;TrustServerCertificate=True;Pooling=true;Max Pool Size=50;";
+    private static readonly string TestConnectionString =
+        Environment.GetEnvironmentVariable("ADOLITE_SQLSERVER_CONNECTION") ??
+        DefaultConnectionString;
 
 
 
@@ -862,6 +865,11 @@ public class DataQueryIntegrationTests : IDisposable
     [Fact]
     public void SaveChanges_BatchInsert_UsingTableValuedParameter_Works()
     {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ADOLITE_SQLSERVER_ALLOW_TVP")))
+        {
+            throw new SkipException("Set ADOLITE_SQLSERVER_ALLOW_TVP to run TVP integration test.");
+        }
+
         // --- Arrange ---
 
         // Ensure UserTableType exists

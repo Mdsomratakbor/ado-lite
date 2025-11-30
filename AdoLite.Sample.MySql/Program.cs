@@ -13,11 +13,18 @@ using Microsoft.Extensions.Logging;
 var services = new ServiceCollection();
 services.AddLogging(builder => builder.AddSimpleConsole());
 
+var myConnection = Environment.GetEnvironmentVariable("ADOLITE_MYSQL_CONNECTION");
+if (string.IsNullOrWhiteSpace(myConnection))
+{
+    Console.WriteLine("Set ADOLITE_MYSQL_CONNECTION to run the MySQL sample.");
+    return;
+}
+
 var settings = new DatabaseSettings();
 settings.Connections["Default"] = new DatabaseConfig
 {
     Provider = DatabaseProvider.MySQL,
-    ConnectionString = "Server=localhost;Database=sampledb;Uid=root;Pwd=yourpassword;Pooling=true;MaximumPoolSize=50;"
+    ConnectionString = myConnection
 };
 
 services.AddAdoLiteDataContexts(settings);
