@@ -24,7 +24,7 @@ namespace AdoLite.Tests.SqlServer
             }
             catch (Exception ex)
             {
-                throw new SkipTestException($"SQL Server unavailable for concurrency test: {ex.Message}");
+                throw new SkipException($"SQL Server unavailable for concurrency test: {ex.Message}");
             }
             return conn;
         }
@@ -33,7 +33,7 @@ namespace AdoLite.Tests.SqlServer
         public async Task Concurrent_Reads_WorkWithoutErrors()
         {
             var conn = GetConnectionOrSkip();
-            const int requestCount = 50;
+            const int requestCount = 500;
             var tasks = new List<Task<int>>(requestCount);
 
             for (int i = 0; i < requestCount; i++)
@@ -53,7 +53,7 @@ namespace AdoLite.Tests.SqlServer
         public async Task Concurrent_Reads_AverageLatency_IsReasonable()
         {
             var conn = GetConnectionOrSkip();
-            const int requestCount = 20;
+            const int requestCount = 200;
             var sw = Stopwatch.StartNew();
 
             var tasks = Enumerable.Range(0, requestCount).Select(_ => Task.Run(() =>
