@@ -90,4 +90,9 @@ Pass an `ILogger<DataQuery>` via DI; operations log SQL (trimmed), parameters, d
 - Raw SQL is used; ensure parameters are used for untrusted input. Typed parameters are recommended for complex types/TVPs.
 - Nullability warnings remain; tighten annotations/guards for production use.
 - Bulk implementations are simple row-by-row inserts (except SQL Server TVP support); for very large loads, consider provider-specific bulk APIs.
+
+## Comparison to Other Tools
+- **Dapper**: Dapper focuses on micro-ORM mapping; AdoLite focuses on provider-agnostic helpers (queries, transactions, bulk) with multi-DB DI support and logging hooks. You can still use Dapper on top of AdoLite’s connections if you prefer richer mapping.
+- **Entity Framework Core**: EF Core provides full ORM (change tracking, LINQ-to-SQL, migrations). AdoLite is lighter-weight, SQL-centric, with explicit control over commands and parameters; no tracking or LINQ translation.
+- **Raw ADO.NET**: AdoLite reduces boilerplate (opening/closing connections, mapping rows, transactions, bulk helpers) while keeping low-level control (SQL text, parameters).
 ```
